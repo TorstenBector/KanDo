@@ -10,8 +10,9 @@ import { theme } from '../theme'
 
 // Status changes automatically when a card moves column; manual order
 // (priority_rank) only matters within "prioriterad" — see spec.md.
+// Note: "Idé" is an item *type* (Idé/Projekt/Task, shown as a badge on
+// each card), not a workflow stage — it doesn't get its own column here.
 const COLUMNS = [
-  { id: 'idea', label: 'Idé' },
   { id: 'backlog', label: 'Backlog' },
   { id: 'prioriterad', label: 'Prioriterad' },
   { id: 'planerad', label: 'Planerad' },

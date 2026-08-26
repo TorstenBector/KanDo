@@ -85,7 +85,7 @@ Idea, Project och Task delar samma underliggande tabell (`items`) med en typkolu
 | original_text | text | rå fångst (röst-transkript eller inklistrad text) |
 | ai_interpretation | text | AI-tolkning, om AI Capture använts |
 | description | text | fritext/anteckningar |
-| status | enum | `idea` \| `backlog` \| `prioriterad` \| `planerad` \| `pagar` \| `klar` |
+| status | enum | `backlog` \| `prioriterad` \| `planerad` \| `pagar` \| `klar` |
 | backlog_priority | enum | `hog` \| `medel` \| `lag` — attribut 1, statisk tagg |
 | priority_rank | int | attribut 2 — relativ ordning, satt bara i status `prioriterad` |
 | scheduled_date | date | för Dagens Fokus |
@@ -169,10 +169,12 @@ Se `backlog_priority` och `priority_rank` i Datamodell ovan.
 # Kanban
 
 ```text
-Idé → Backlog → Prioriterad → Planerad → Pågår → Klar
+Backlog → Prioriterad → Planerad → Pågår → Klar
 ```
 
 Status ändras automatiskt när ett kort flyttas. Alltid möjligt att flytta både framåt och bakåt.
+
+**Rättelse (2026-08-27):** Ursprungsspecen hade en egen "Idé"-kolumn först i flödet. Det visade sig i praktiken vara fel modell — Idé/Projekt/Task är en **typ** (vilken sorts objekt det är, en oberoende egenskap som visas som badge på varje kort), inte ett **arbetsflödessteg**. Att ha "idea" som både typ-värde och statusvärde skapade förvirring (går det att flytta *typen* Idé, eller *statusen* Idé?). Alla objekt startar nu direkt i Backlog oavsett typ.
 
 ---
 

@@ -39,7 +39,7 @@ export async function createItem({ type, title, original_text = null, descriptio
     original_text,
     ai_interpretation: null,
     description,
-    status: 'idea',
+    status: 'backlog',
     backlog_priority: null,
     priority_rank: null,
     scheduled_date: null,

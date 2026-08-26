@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
-import { updateItem, deleteItem } from '../hooks/useItems'
+import { updateItem, deleteItem, markDone } from '../hooks/useItems'
 import { findOrCreateTag, useItemTags } from '../hooks/useTags'
 import { theme } from '../theme'
 
@@ -21,7 +21,14 @@ const PRIORITY_OPTIONS = [
 
 export default function BacklogView() {
   const [typeFilter, setTypeFilter] = useState('all')
-  const items = useLiveQuery(() => db.items.orderBy('created_at').reverse().toArray(), []) ?? []
+  const items = useLiveQuery(
+    async () => {
+      const all = await db.items.orderBy('created_at').reverse().toArray()
+      // Completed items move to the Utförda tab instead of lingering here.
+      return all.filter((i) => i.status !== 'klar')
+    },
+    []
+  ) ?? []
 
   const visible = useMemo(
     () => (typeFilter === 'all' ? items : items.filter((i) => i.type === typeFilter)),
@@ -89,6 +96,25 @@ function BacklogItemRow({ item }) {
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
+        <button
+          onClick={() => markDone(item.id)}
+          title="Markera som klar"
+          style={{
+            border: `1.5px solid ${theme.colors.border}`,
+            background: theme.colors.bg,
+            borderRadius: '50%',
+            width: '1.3rem',
+            height: '1.3rem',
+            flexShrink: 0,
+            marginTop: '0.15rem',
+            cursor: 'pointer',
+            padding: 0,
+            color: theme.colors.success,
+            fontSize: '0.8rem',
+          }}
+        >
+          ✓
+        </button>
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.1rem' }}>
             <select

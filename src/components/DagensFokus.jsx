@@ -1,5 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
+import { markDone } from '../hooks/useItems'
 import { theme } from '../theme'
 
 const TYPE_LABEL = { idea: 'Idé', project: 'Projekt', task: 'Task' }
@@ -46,12 +47,35 @@ export default function DagensFokus() {
               borderRadius: theme.radius.sm,
               padding: '0.6rem 0.8rem',
               boxShadow: theme.shadow.sm,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.6rem',
             }}
           >
-            <div style={{ fontSize: '0.7rem', color: theme.colors.textMuted, textTransform: 'uppercase' }}>
-              {TYPE_LABEL[item.type]}
+            <button
+              onClick={() => markDone(item.id)}
+              title="Markera som klar"
+              style={{
+                border: `1.5px solid ${theme.colors.border}`,
+                background: theme.colors.bg,
+                borderRadius: '50%',
+                width: '1.3rem',
+                height: '1.3rem',
+                flexShrink: 0,
+                cursor: 'pointer',
+                padding: 0,
+                color: theme.colors.success,
+                fontSize: '0.8rem',
+              }}
+            >
+              ✓
+            </button>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: '0.7rem', color: theme.colors.textMuted, textTransform: 'uppercase' }}>
+                {TYPE_LABEL[item.type]}
+              </div>
+              <div style={{ color: theme.colors.text, fontWeight: 500 }}>{item.title}</div>
             </div>
-            <div style={{ color: theme.colors.text, fontWeight: 500 }}>{item.title}</div>
           </div>
         ))}
       </div>

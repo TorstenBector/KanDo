@@ -1,5 +1,6 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
+import { markDone } from '../hooks/useItems'
 import { theme } from '../theme'
 
 const TYPE_LABEL = { idea: 'Idé', project: 'Projekt', task: 'Task' }
@@ -18,21 +19,50 @@ export default function ItemCard({ item }) {
     borderRadius: theme.radius.sm,
     padding: '0.5rem 0.6rem',
     boxShadow: theme.shadow.sm,
-    cursor: 'grab',
-    touchAction: 'none',
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: '0.4rem',
   }
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
-      <div style={{ fontSize: '0.7rem', color: theme.colors.textMuted, textTransform: 'uppercase' }}>
-        {TYPE_LABEL[item.type]}
-      </div>
-      <div style={{ color: theme.colors.text, fontWeight: 500 }}>{item.title}</div>
-      {item.backlog_priority && (
-        <div style={{ fontSize: '0.7rem', color: PRIORITY_COLOR[item.backlog_priority], marginTop: '0.25rem' }}>
-          ● {PRIORITY_LABEL[item.backlog_priority]}
-        </div>
+    <div ref={setNodeRef} style={style}>
+      {item.status !== 'klar' && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation()
+            markDone(item.id)
+          }}
+          onPointerDown={(e) => e.stopPropagation()}
+          title="Markera som klar"
+          style={{
+            border: `1.5px solid ${theme.colors.border}`,
+            background: theme.colors.surface,
+            borderRadius: '50%',
+            width: '1.1rem',
+            height: '1.1rem',
+            flexShrink: 0,
+            marginTop: '0.15rem',
+            cursor: 'pointer',
+            padding: 0,
+            lineHeight: 1,
+            color: theme.colors.success,
+            fontSize: '0.7rem',
+          }}
+        >
+          ✓
+        </button>
       )}
+      <div {...attributes} {...listeners} style={{ flex: 1, cursor: 'grab', touchAction: 'none' }}>
+        <div style={{ fontSize: '0.7rem', color: theme.colors.textMuted, textTransform: 'uppercase' }}>
+          {TYPE_LABEL[item.type]}
+        </div>
+        <div style={{ color: theme.colors.text, fontWeight: 500 }}>{item.title}</div>
+        {item.backlog_priority && (
+          <div style={{ fontSize: '0.7rem', color: PRIORITY_COLOR[item.backlog_priority], marginTop: '0.25rem' }}>
+            ● {PRIORITY_LABEL[item.backlog_priority]}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

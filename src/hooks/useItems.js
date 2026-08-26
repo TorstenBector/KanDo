@@ -1,5 +1,12 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
+import { useSyncStore } from '../store/syncStore'
+
+function triggerPush() {
+  // Best-effort, fire-and-forget: write-through sync per spec.md — local
+  // write already happened, this just tries to get it to the server too.
+  useSyncStore.getState().pushOnly()
+}
 
 export function useItems({ type, status } = {}) {
   return useLiveQuery(async () => {
@@ -13,9 +20,10 @@ export function useItems({ type, status } = {}) {
 
 export async function createItem({ type, title, original_text = null, description = null }) {
   const now = new Date().toISOString()
+  const userId = useSyncStore.getState().session?.user?.id ?? null
   const item = {
     id: crypto.randomUUID(),
-    user_id: null,
+    user_id: userId,
     type,
     title,
     original_text,
@@ -31,6 +39,7 @@ export async function createItem({ type, title, original_text = null, descriptio
     _syncStatus: 'pending',
   }
   await db.items.add(item)
+  triggerPush()
   return item
 }
 
@@ -40,6 +49,15 @@ export async function updateItem(id, changes) {
     updated_at: new Date().toISOString(),
     _syncStatus: 'pending',
   })
+  triggerPush()
+}
+
+export async function markDone(id) {
+  await updateItem(id, { status: 'klar', completed_at: new Date().toISOString() })
+}
+
+export async function reopenItem(id) {
+  await updateItem(id, { status: 'prioriterad', completed_at: null })
 }
 
 export async function deleteItem(id) {
@@ -59,4 +77,5 @@ export async function reorderPrioritized(orderedIds) {
       })
     }
   })
+  triggerPush()
 }

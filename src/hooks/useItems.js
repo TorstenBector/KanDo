@@ -8,6 +8,16 @@ function triggerPush() {
   useSyncStore.getState().pushOnly()
 }
 
+function todayISO() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function addDays(isoDate, days) {
+  const d = new Date(isoDate)
+  d.setDate(d.getDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
 export function useItems({ type, status } = {}) {
   return useLiveQuery(async () => {
     const all = await db.items.toArray()
@@ -34,6 +44,9 @@ export async function createItem({ type, title, original_text = null, descriptio
     priority_rank: null,
     scheduled_date: null,
     completed_at: null,
+    recurrence_days: null,
+    next_due_date: null,
+    last_completed_at: null,
     created_at: now,
     updated_at: now,
     _syncStatus: 'pending',
@@ -53,7 +66,13 @@ export async function updateItem(id, changes) {
 }
 
 export async function markDone(id) {
-  await updateItem(id, { status: 'klar', completed_at: new Date().toISOString() })
+  const item = await db.items.get(id)
+  const now = new Date().toISOString()
+  const changes = { status: 'klar', completed_at: now, last_completed_at: now }
+  if (item?.recurrence_days) {
+    changes.next_due_date = addDays(todayISO(), item.recurrence_days)
+  }
+  await updateItem(id, changes)
 }
 
 export async function reopenItem(id) {
@@ -78,4 +97,35 @@ export async function reorderPrioritized(orderedIds) {
     }
   })
   triggerPush()
+}
+
+export async function scheduleToday(id) {
+  await updateItem(id, { scheduled_date: todayISO() })
+}
+
+export async function unschedule(id) {
+  await updateItem(id, { scheduled_date: null })
+}
+
+export async function setRecurrence(id, days) {
+  await updateItem(id, { recurrence_days: days })
+}
+
+// Recurring items marked done reappear in Backlog once their frequency
+// elapses, instead of staying in Utförda forever. Runs on app load — this
+// is a local-first app with no server cron, so "due" is checked whenever
+// a device happens to open the app.
+export async function reactivateDueRecurringItems() {
+  const today = todayISO()
+  const due = await db.items
+    .filter((i) => i.status === 'klar' && !!i.recurrence_days && i.next_due_date && i.next_due_date <= today)
+    .toArray()
+  for (const item of due) {
+    await updateItem(item.id, {
+      status: 'backlog',
+      completed_at: null,
+      next_due_date: null,
+      scheduled_date: null, // stale from the previous cycle, not this one
+    })
+  }
 }

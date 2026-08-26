@@ -86,6 +86,11 @@ export default function UtfordaView() {
                     <div style={{ color: theme.colors.text, fontWeight: 500, textDecoration: 'line-through' }}>
                       {item.title}
                     </div>
+                    {item.recurrence_days && item.next_due_date && (
+                      <div style={{ fontSize: '0.7rem', color: theme.colors.textMuted, textDecoration: 'none' }}>
+                        🔁 Återkommer {item.next_due_date}
+                      </div>
+                    )}
                   </div>
                   <button
                     onClick={() => reopenItem(item.id)}

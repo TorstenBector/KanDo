@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
-import { markDone } from '../hooks/useItems'
+import { markDone, unschedule } from '../hooks/useItems'
 import { theme } from '../theme'
 
 const TYPE_LABEL = { idea: 'Idé', project: 'Projekt', task: 'Task' }
@@ -76,6 +76,21 @@ export default function DagensFokus() {
               </div>
               <div style={{ color: theme.colors.text, fontWeight: 500 }}>{item.title}</div>
             </div>
+            {showScheduled && (
+              <button
+                onClick={() => unschedule(item.id)}
+                title="Ta bort från Dagens Fokus"
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  color: theme.colors.textMuted,
+                  cursor: 'pointer',
+                  fontSize: '0.9rem',
+                }}
+              >
+                ✕
+              </button>
+            )}
           </div>
         ))}
       </div>

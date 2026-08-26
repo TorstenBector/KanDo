@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
-import { updateItem, deleteItem, markDone } from '../hooks/useItems'
+import { updateItem, deleteItem, markDone, scheduleToday, unschedule, setRecurrence } from '../hooks/useItems'
 import { findOrCreateTag, useItemTags } from '../hooks/useTags'
 import { theme } from '../theme'
 
@@ -18,6 +18,17 @@ const PRIORITY_OPTIONS = [
   { value: 'medel', label: 'Medel' },
   { value: 'lag', label: 'Låg' },
 ]
+
+const RECURRENCE_PRESETS = [
+  { value: '', label: '🔁 Ingen upprepning' },
+  { value: '7', label: '🔁 Varje vecka' },
+  { value: '14', label: '🔁 Var 14:e dag' },
+  { value: 'custom', label: '🔁 Anpassat…' },
+]
+
+function todayISO() {
+  return new Date().toISOString().slice(0, 10)
+}
 
 export default function BacklogView() {
   const [typeFilter, setTypeFilter] = useState('all')
@@ -71,7 +82,19 @@ export default function BacklogView() {
 
 function BacklogItemRow({ item }) {
   const [tagInput, setTagInput] = useState('')
+  const [customRecurrence, setCustomRecurrence] = useState(false)
   const tags = useItemTags(item.id) ?? []
+  const isScheduledToday = item.scheduled_date === todayISO()
+  const recurrencePreset = [7, 14].includes(item.recurrence_days) ? String(item.recurrence_days) : (item.recurrence_days ? 'custom' : '')
+
+  function handleRecurrenceChange(value) {
+    if (value === 'custom') {
+      setCustomRecurrence(true)
+      return
+    }
+    setCustomRecurrence(false)
+    setRecurrence(item.id, value ? Number(value) : null)
+  }
 
   async function addTag(kind) {
     const name = tagInput.trim()
@@ -214,6 +237,63 @@ function BacklogItemRow({ item }) {
             <button onClick={() => addTag('category')} style={miniBtn}>som kategori</button>
             <button onClick={() => addTag('context')} style={miniBtn}>som sammanhang</button>
           </>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem', alignItems: 'center' }}>
+        <button
+          onClick={() => (isScheduledToday ? unschedule(item.id) : scheduleToday(item.id))}
+          style={{
+            fontSize: '0.75rem',
+            border: `1px solid ${isScheduledToday ? theme.colors.primary : theme.colors.border}`,
+            borderRadius: '999px',
+            padding: '0.2rem 0.6rem',
+            background: isScheduledToday ? theme.colors.primary : 'transparent',
+            color: isScheduledToday ? theme.colors.textOnPrimary : theme.colors.textMuted,
+            cursor: 'pointer',
+          }}
+        >
+          {isScheduledToday ? '✓ I Dagens Fokus' : '+ Dagens Fokus'}
+        </button>
+
+        <select
+          value={recurrencePreset}
+          onChange={(e) => handleRecurrenceChange(e.target.value)}
+          style={{
+            fontSize: '0.75rem',
+            border: `1px solid ${theme.colors.border}`,
+            borderRadius: '999px',
+            padding: '0.2rem 0.5rem',
+            background: item.recurrence_days ? theme.colors.surfaceGreen : 'transparent',
+            color: theme.colors.text,
+          }}
+        >
+          {RECURRENCE_PRESETS.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+
+        {customRecurrence && (
+          <input
+            type="number"
+            min="1"
+            autoFocus
+            placeholder="antal dagar"
+            defaultValue={item.recurrence_days && ![7, 14].includes(item.recurrence_days) ? item.recurrence_days : ''}
+            onBlur={(e) => {
+              const days = Number(e.target.value)
+              if (days > 0) setRecurrence(item.id, days)
+              setCustomRecurrence(false)
+            }}
+            onKeyDown={(e) => e.key === 'Enter' && e.target.blur()}
+            style={{
+              fontSize: '0.75rem',
+              border: `1px solid ${theme.colors.border}`,
+              borderRadius: theme.radius.sm,
+              padding: '0.2rem 0.4rem',
+              width: '80px',
+            }}
+          />
         )}
       </div>
     </div>

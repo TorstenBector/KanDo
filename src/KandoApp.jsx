@@ -7,6 +7,7 @@ import KanbanBoard from './components/KanbanBoard'
 import UtfordaView from './components/UtfordaView'
 import AccountPanel from './components/AccountPanel'
 import { useSyncStore } from './store/syncStore'
+import { reactivateDueRecurringItems } from './hooks/useItems'
 import { theme } from './theme'
 
 const TABS = [
@@ -23,6 +24,7 @@ export default function KandoApp() {
 
   useEffect(() => {
     initSync()
+    reactivateDueRecurringItems()
   }, [initSync])
 
   return (

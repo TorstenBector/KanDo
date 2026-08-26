@@ -1,6 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
-import { markDone, unschedule } from '../hooks/useItems'
+import { markDone, reopenItem, unschedule } from '../hooks/useItems'
 import { theme } from '../theme'
 
 const TYPE_LABEL = { idea: 'Idé', project: 'Projekt', task: 'Task' }
@@ -22,7 +22,15 @@ export default function DagensFokus() {
   }, [])
 
   const showScheduled = (scheduledToday?.length ?? 0) > 0
-  const list = showScheduled ? scheduledToday : (topPriority ?? [])
+  const rawList = showScheduled ? scheduledToday : (topPriority ?? [])
+
+  // Done items stay visible (still "today's focus") but float to the top
+  // so it's obvious at a glance what's already handled.
+  const list = [...rawList].sort((a, b) => {
+    const aDone = a.status === 'klar' ? 0 : 1
+    const bDone = b.status === 'klar' ? 0 : 1
+    return aDone - bDone
+  })
 
   return (
     <div style={{ padding: '1rem' }}>
@@ -38,61 +46,73 @@ export default function DagensFokus() {
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        {list.map((item) => (
-          <div
-            key={item.id}
-            style={{
-              background: theme.colors.surface,
-              border: `1px solid ${theme.colors.border}`,
-              borderRadius: theme.radius.sm,
-              padding: '0.6rem 0.8rem',
-              boxShadow: theme.shadow.sm,
-              display: 'flex',
-              alignItems: 'center',
-              gap: '0.6rem',
-            }}
-          >
-            <button
-              onClick={() => markDone(item.id)}
-              title="Markera som klar"
+        {list.map((item) => {
+          const done = item.status === 'klar'
+          return (
+            <div
+              key={item.id}
               style={{
-                border: `1.5px solid ${theme.colors.border}`,
-                background: theme.colors.bg,
-                borderRadius: '50%',
-                width: '1.3rem',
-                height: '1.3rem',
-                flexShrink: 0,
-                cursor: 'pointer',
-                padding: 0,
-                color: theme.colors.success,
-                fontSize: '0.8rem',
+                background: done ? theme.colors.surfaceGreen : theme.colors.surface,
+                border: `1px solid ${done ? theme.colors.success : theme.colors.border}`,
+                borderRadius: theme.radius.sm,
+                padding: '0.6rem 0.8rem',
+                boxShadow: theme.shadow.sm,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.6rem',
               }}
             >
-              ✓
-            </button>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: '0.7rem', color: theme.colors.textMuted, textTransform: 'uppercase' }}>
-                {TYPE_LABEL[item.type]}
-              </div>
-              <div style={{ color: theme.colors.text, fontWeight: 500 }}>{item.title}</div>
-            </div>
-            {showScheduled && (
               <button
-                onClick={() => unschedule(item.id)}
-                title="Ta bort från Dagens Fokus"
+                onClick={() => (done ? reopenItem(item.id) : markDone(item.id))}
+                title={done ? 'Ångra' : 'Markera som klar'}
                 style={{
-                  border: 'none',
-                  background: 'transparent',
-                  color: theme.colors.textMuted,
+                  border: `1.5px solid ${theme.colors.success}`,
+                  background: done ? theme.colors.success : theme.colors.bg,
+                  borderRadius: '50%',
+                  width: '1.3rem',
+                  height: '1.3rem',
+                  flexShrink: 0,
                   cursor: 'pointer',
-                  fontSize: '0.9rem',
+                  padding: 0,
+                  color: done ? '#ffffff' : theme.colors.success,
+                  fontSize: '0.8rem',
+                  fontWeight: 700,
                 }}
               >
-                ✕
+                ✓
               </button>
-            )}
-          </div>
-        ))}
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '0.7rem', color: theme.colors.textMuted, textTransform: 'uppercase' }}>
+                  {TYPE_LABEL[item.type]}
+                </div>
+                <div
+                  style={{
+                    color: done ? theme.colors.textMuted : theme.colors.text,
+                    fontWeight: 500,
+                    textDecoration: done ? 'line-through' : 'none',
+                  }}
+                >
+                  {item.title}
+                </div>
+              </div>
+              {showScheduled && (
+                <button
+                  onClick={() => unschedule(item.id)}
+                  title="Ta bort från Dagens Fokus"
+                  style={{
+                    border: 'none',
+                    background: 'transparent',
+                    color: theme.colors.textMuted,
+                    cursor: 'pointer',
+                    fontSize: '0.9rem',
+                  }}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+          )
+        })}
       </div>
     </div>
   )

@@ -7,7 +7,7 @@ export const useSyncStore = create((set, get) => ({
   session: null,
   syncing: false,
   lastSyncedAt: null,
-  pendingCount: 0,
+  syncError: null,
   authMessage: null,
 
   setOnline: (isOnline) => set({ isOnline }),
@@ -42,22 +42,34 @@ export const useSyncStore = create((set, get) => ({
     set({ session: null })
   },
 
+  // Deliberately NOT gated on `isOnline` — that flag comes from
+  // navigator.onLine, which is known to misreport (especially on mobile:
+  // can say "offline" while genuinely connected). A silent no-op there
+  // is exactly what looked like "sync button does nothing". Let the real
+  // network call decide; if it fails, surface why instead of staying quiet.
   async sync() {
-    const { session, isOnline, syncing } = get()
-    if (!session || !isOnline || syncing) return
-    set({ syncing: true })
+    const { session, syncing } = get()
+    if (!session || syncing) return
+    set({ syncing: true, syncError: null })
     try {
       await runFullSync(session.user.id)
       set({ lastSyncedAt: new Date().toISOString() })
+    } catch (err) {
+      set({ syncError: err?.message || 'Okänt fel vid synk' })
     } finally {
       set({ syncing: false })
     }
   },
 
   async pushOnly() {
-    const { session, isOnline } = get()
-    if (!session || !isOnline) return
-    await pushPendingChanges(session.user.id)
+    const { session } = get()
+    if (!session) return
+    try {
+      await pushPendingChanges(session.user.id)
+      set({ syncError: null })
+    } catch (err) {
+      set({ syncError: err?.message || 'Okänt fel vid synk' })
+    }
   },
 }))
 

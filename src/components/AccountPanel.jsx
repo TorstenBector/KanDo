@@ -9,6 +9,7 @@ export default function AccountPanel() {
   const [email, setEmail] = useState('')
   const session = useSyncStore((s) => s.session)
   const syncing = useSyncStore((s) => s.syncing)
+  const syncError = useSyncStore((s) => s.syncError)
   const authMessage = useSyncStore((s) => s.authMessage)
   const sendMagicLink = useSyncStore((s) => s.sendMagicLink)
   const signOut = useSyncStore((s) => s.signOut)
@@ -41,7 +42,13 @@ export default function AccountPanel() {
       >
         {session ? (
           <>
-            {syncing ? '⟳ Synkar…' : pendingCount > 0 ? `● ${pendingCount} osynkat` : '✓ Synkad'}
+            {syncing
+              ? '⟳ Synkar…'
+              : syncError
+                ? '⚠ Synkfel'
+                : pendingCount > 0
+                  ? `● ${pendingCount} osynkat`
+                  : '✓ Synkad'}
           </>
         ) : (
           '⚠ Logga in'
@@ -71,6 +78,11 @@ export default function AccountPanel() {
               <p style={{ color: theme.colors.textMuted, fontSize: '0.8rem', margin: '0 0 0.75rem' }}>
                 {pendingCount > 0 ? `${pendingCount} ändringar väntar på synk.` : 'Allt synkat.'}
               </p>
+              {syncError && (
+                <p style={{ color: theme.colors.danger, fontSize: '0.75rem', margin: '0 0 0.75rem' }}>
+                  ⚠ {syncError}
+                </p>
+              )}
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <button onClick={() => sync()} style={secondaryBtn} disabled={syncing}>
                   {syncing ? 'Synkar…' : 'Synka nu'}

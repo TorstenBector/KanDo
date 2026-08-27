@@ -23,23 +23,26 @@ export async function pushPendingChanges(userId) {
   for (const item of pendingItems) {
     const { _syncStatus, ...row } = item
     const { error } = await supabase.from('items').upsert({ ...row, user_id: userId })
-    if (!error) {
-      await db.items.update(item.id, { _syncStatus: 'synced' })
+    if (error) {
+      throw new Error(`Kunde inte synka "${item.title}": ${error.message}`)
     }
+    await db.items.update(item.id, { _syncStatus: 'synced' })
   }
 
   // Tags/links are cheap append-mostly data — just upsert the lot each time
   // rather than tracking a separate dirty flag for them.
   const localTags = await db.tags.where('user_id').equals(userId).toArray()
   if (localTags.length > 0) {
-    await supabase.from('tags').upsert(localTags)
+    const { error } = await supabase.from('tags').upsert(localTags)
+    if (error) throw new Error(`Kunde inte synka taggar: ${error.message}`)
   }
 
   const localItemIds = (await db.items.where('user_id').equals(userId).primaryKeys())
   if (localItemIds.length > 0) {
     const links = await db.item_tags.where('item_id').anyOf(localItemIds).toArray()
     if (links.length > 0) {
-      await supabase.from('item_tags').upsert(links)
+      const { error } = await supabase.from('item_tags').upsert(links)
+      if (error) throw new Error(`Kunde inte synka taggkopplingar: ${error.message}`)
     }
   }
 }

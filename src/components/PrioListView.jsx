@@ -3,7 +3,7 @@ import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } 
 import { CSS } from '@dnd-kit/utilities'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
-import { markDone, reorderPrioritized } from '../hooks/useItems'
+import { markDone, reorderPrioritized, togglePrioritized } from '../hooks/useItems'
 import { theme } from '../theme'
 
 const TYPE_LABEL = { idea: 'Idé', project: 'Projekt', task: 'Task' }
@@ -100,6 +100,24 @@ function PrioRow({ item, rank }) {
         </div>
         <div style={{ color: theme.colors.text, fontWeight: 500 }}>{item.title}</div>
       </div>
+
+      <button
+        onClick={() => togglePrioritized(item.id)}
+        onPointerDown={(e) => e.stopPropagation()}
+        title="Flytta tillbaka till Backlog"
+        style={{
+          border: `1px solid ${theme.colors.border}`,
+          background: 'transparent',
+          borderRadius: theme.radius.sm,
+          padding: '0.25rem 0.5rem',
+          fontSize: '0.7rem',
+          color: theme.colors.textMuted,
+          cursor: 'pointer',
+          flexShrink: 0,
+        }}
+      >
+        ← Backlog
+      </button>
     </div>
   )
 }

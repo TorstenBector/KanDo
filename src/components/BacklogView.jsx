@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
-import { updateItem, deleteItem, markDone, scheduleToday, unschedule, setRecurrence } from '../hooks/useItems'
+import { updateItem, deleteItem, markDone, scheduleToday, unschedule, setRecurrence, togglePrioritized } from '../hooks/useItems'
 import { findOrCreateTag, useItemTags } from '../hooks/useTags'
 import { theme } from '../theme'
 
@@ -85,6 +85,7 @@ function BacklogItemRow({ item }) {
   const [customRecurrence, setCustomRecurrence] = useState(false)
   const tags = useItemTags(item.id) ?? []
   const isScheduledToday = item.scheduled_date === todayISO()
+  const isPrioritized = item.status === 'prioriterad'
   const recurrencePreset = [7, 14].includes(item.recurrence_days) ? String(item.recurrence_days) : (item.recurrence_days ? 'custom' : '')
 
   function handleRecurrenceChange(value) {
@@ -241,6 +242,21 @@ function BacklogItemRow({ item }) {
       </div>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem', alignItems: 'center' }}>
+        <button
+          onClick={() => togglePrioritized(item.id)}
+          style={{
+            fontSize: '0.75rem',
+            border: `1px solid ${isPrioritized ? theme.colors.primary : theme.colors.border}`,
+            borderRadius: '999px',
+            padding: '0.2rem 0.6rem',
+            background: isPrioritized ? theme.colors.primary : 'transparent',
+            color: isPrioritized ? theme.colors.textOnPrimary : theme.colors.textMuted,
+            cursor: 'pointer',
+          }}
+        >
+          {isPrioritized ? '✓ I Prioriterad' : '+ Prioriterad'}
+        </button>
+
         <button
           onClick={() => (isScheduledToday ? unschedule(item.id) : scheduleToday(item.id))}
           style={{

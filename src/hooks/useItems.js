@@ -111,6 +111,20 @@ export async function setRecurrence(id, days) {
   await updateItem(id, { recurrence_days: days })
 }
 
+// Direct promote/demote between Backlog and Prioriterad, without needing
+// to go through Kanban drag-and-drop — same "+X toggle" pattern as
+// scheduleToday/unschedule.
+export async function togglePrioritized(id) {
+  const item = await db.items.get(id)
+  if (!item) return
+  if (item.status === 'prioriterad') {
+    await updateItem(id, { status: 'backlog', priority_rank: null })
+  } else {
+    const count = await db.items.where('status').equals('prioriterad').count()
+    await updateItem(id, { status: 'prioriterad', priority_rank: count })
+  }
+}
+
 // Recurring items marked done reappear in Backlog once their frequency
 // elapses, instead of staying in Utförda forever. Runs on app load — this
 // is a local-first app with no server cron, so "due" is checked whenever

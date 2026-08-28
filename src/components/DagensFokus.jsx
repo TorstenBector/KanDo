@@ -24,12 +24,14 @@ export default function DagensFokus() {
   const showScheduled = (scheduledToday?.length ?? 0) > 0
   const rawList = showScheduled ? scheduledToday : (topPriority ?? [])
 
-  // Done items stay visible (still "today's focus") but float to the top
-  // so it's obvious at a glance what's already handled.
+  // Done items float to the top (see markDone/reopenItem below); within
+  // each group, keep the same order as the Prio tab's priority_rank —
+  // items never sent through Prioriterad (no rank) sort after ranked ones.
   const list = [...rawList].sort((a, b) => {
     const aDone = a.status === 'klar' ? 0 : 1
     const bDone = b.status === 'klar' ? 0 : 1
-    return aDone - bDone
+    if (aDone !== bDone) return aDone - bDone
+    return (a.priority_rank ?? 999999) - (b.priority_rank ?? 999999)
   })
 
   return (

@@ -68,9 +68,22 @@ export default function DagensFokus() {
               fontWeight: 500,
             }}
           >
-            <span style={{ color: theme.colors.success, fontSize: '1rem' }}>✓</span>
-            Utförda ({doneItems.length})
-            <span style={{ marginLeft: 'auto', color: theme.colors.textMuted, fontSize: '0.8rem' }}>Visa ▾</span>
+            <span style={{ color: theme.colors.success, fontSize: '1.1rem' }}>✓</span>
+            <span style={{ fontSize: '1.1rem', fontWeight: 700 }}>Utförda ({doneItems.length})</span>
+            <span
+              style={{
+                marginLeft: 'auto',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.25rem',
+                color: theme.colors.textMuted,
+                fontSize: '0.85rem',
+                fontWeight: 500,
+              }}
+            >
+              Visa
+              <span style={{ fontSize: '1.3rem', lineHeight: 1 }}>⌄</span>
+            </span>
           </button>
         ) : (
           <>

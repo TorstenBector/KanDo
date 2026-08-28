@@ -1,9 +1,12 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
+import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core'
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import { db } from '../lib/db'
 import {
   updateItem, deleteItem, cloneItem, setRecurrence,
-  addChildItem, removeChildRelation, markDoneWithConfirm,
+  addChildItem, removeChildRelation, reorderChildren, markDoneWithConfirm,
 } from '../hooks/useItems'
 import { findOrCreateTag, useItemTags } from '../hooks/useTags'
 import { useChildren, useParent } from '../hooks/useRelations'
@@ -31,8 +34,19 @@ export default function ItemDetailModal({ itemId, onClose }) {
   const [tagInput, setTagInput] = useState('')
   const [childInput, setChildInput] = useState('')
   const [customRecurrence, setCustomRecurrence] = useState(false)
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
   if (!itemId || !item) return null
+
+  async function handleChildDragEnd(event) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const oldIndex = children.findIndex((c) => c.id === active.id)
+    const newIndex = children.findIndex((c) => c.id === over.id)
+    if (oldIndex === -1 || newIndex === -1) return
+    const reordered = arrayMove(children, oldIndex, newIndex)
+    await reorderChildren(item.id, reordered.map((c) => c.id))
+  }
 
   const recurrencePreset = [7, 14].includes(item.recurrence_days)
     ? String(item.recurrence_days)
@@ -220,46 +234,25 @@ export default function ItemDetailModal({ itemId, onClose }) {
         </div>
 
         <label style={labelStyle}>Deluppgifter</label>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginBottom: '0.5rem' }}>
-          {children.map((child) => {
-            const done = child.status === 'klar'
-            return (
-              <div
-                key={child.id}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: '0.5rem',
-                  background: theme.colors.surface, border: `1px solid ${theme.colors.border}`,
-                  borderRadius: theme.radius.sm, padding: '0.4rem 0.6rem',
-                }}
-              >
-                <button
-                  onClick={() => markDoneWithConfirm(child.id)}
-                  style={{
-                    border: `1.5px solid ${theme.colors.success}`,
-                    background: done ? theme.colors.success : theme.colors.bg,
-                    borderRadius: '50%', width: '1.1rem', height: '1.1rem', flexShrink: 0,
-                    cursor: 'pointer', padding: 0, color: done ? '#fff' : theme.colors.success, fontSize: '0.7rem',
-                  }}
-                >
-                  ✓
-                </button>
-                <span style={{
-                  flex: 1, fontSize: '0.9rem', color: done ? theme.colors.textMuted : theme.colors.text,
-                  textDecoration: done ? 'line-through' : 'none',
-                }}>
-                  {child.title}
-                </span>
-                <button
-                  onClick={() => removeChildRelation(item.id, child.id)}
-                  title="Koppla bort (tar inte bort objektet)"
-                  style={{ border: 'none', background: 'transparent', color: theme.colors.textMuted, cursor: 'pointer', fontSize: '0.85rem' }}
-                >
-                  ✕
-                </button>
-              </div>
-            )
-          })}
-          <div style={{ display: 'flex', gap: '0.4rem' }}>
+        <div style={{ marginBottom: '0.5rem' }}>
+          {children.length > 1 ? (
+            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleChildDragEnd}>
+              <SortableContext items={children.map((c) => c.id)} strategy={verticalListSortingStrategy}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  {children.map((child) => (
+                    <ChildRow key={child.id} child={child} parentId={item.id} />
+                  ))}
+                </div>
+              </SortableContext>
+            </DndContext>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              {children.map((child) => (
+                <ChildRow key={child.id} child={child} parentId={item.id} />
+              ))}
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.4rem' }}>
             <input
               value={childInput}
               onChange={(e) => setChildInput(e.target.value)}
@@ -281,6 +274,61 @@ export default function ItemDetailModal({ itemId, onClose }) {
           <button onClick={onClose} style={primaryBtn}>Stäng</button>
         </div>
       </div>
+    </div>
+  )
+}
+
+function ChildRow({ child, parentId }) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: child.id })
+  const done = child.status === 'klar'
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    display: 'flex', alignItems: 'center', gap: '0.5rem',
+    background: theme.colors.surface, border: `1px solid ${theme.colors.border}`,
+    borderRadius: theme.radius.sm, padding: '0.4rem 0.6rem',
+  }
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <button
+        onClick={() => markDoneWithConfirm(child.id)}
+        style={{
+          border: `1.5px solid ${theme.colors.success}`,
+          background: done ? theme.colors.success : theme.colors.bg,
+          borderRadius: '50%', width: '1.1rem', height: '1.1rem', flexShrink: 0,
+          cursor: 'pointer', padding: 0, color: done ? '#fff' : theme.colors.success, fontSize: '0.7rem',
+        }}
+      >
+        ✓
+      </button>
+      <span style={{
+        flex: 1, fontSize: '0.9rem', color: done ? theme.colors.textMuted : theme.colors.text,
+        textDecoration: done ? 'line-through' : 'none',
+      }}>
+        {child.title}
+      </span>
+      <div
+        {...attributes}
+        {...listeners}
+        title="Dra för att ändra ordning"
+        style={{
+          flexShrink: 0, width: '1.4rem', height: '1.4rem', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', cursor: 'grab', touchAction: 'none',
+          color: theme.colors.textMuted, fontSize: '0.95rem', letterSpacing: '-1px',
+        }}
+      >
+        ⠿
+      </div>
+      <button
+        onClick={() => removeChildRelation(parentId, child.id)}
+        title="Koppla bort (tar inte bort objektet)"
+        style={{ border: 'none', background: 'transparent', color: theme.colors.textMuted, cursor: 'pointer', fontSize: '0.85rem' }}
+      >
+        ✕
+      </button>
     </div>
   )
 }

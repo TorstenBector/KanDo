@@ -186,6 +186,9 @@ export async function addChildItem(parentId, title) {
   const child = await createItem({ type: parent.type, title })
   await updateItem(child.id, { status: parent.status })
 
+  const existing = await db.item_relations
+    .where({ from_item_id: parentId, relation_type: 'parent_child' })
+    .count()
   const userId = useSyncStore.getState().session?.user?.id ?? null
   await db.item_relations.add({
     id: crypto.randomUUID(),
@@ -193,10 +196,27 @@ export async function addChildItem(parentId, title) {
     from_item_id: parentId,
     to_item_id: child.id,
     relation_type: 'parent_child',
+    sort_order: existing,
     created_at: new Date().toISOString(),
   })
   triggerPush()
   return child
+}
+
+// Manual drag order for a parent's subtasks — mirrors reorderPrioritized
+// but scoped to item_relations rows instead of items.priority_rank.
+export async function reorderChildren(parentId, orderedChildIds) {
+  const relations = await db.item_relations
+    .where({ from_item_id: parentId, relation_type: 'parent_child' })
+    .toArray()
+  const relationByChildId = new Map(relations.map((r) => [r.to_item_id, r]))
+  await db.transaction('rw', db.item_relations, async () => {
+    for (let i = 0; i < orderedChildIds.length; i++) {
+      const relation = relationByChildId.get(orderedChildIds[i])
+      if (relation) await db.item_relations.update(relation.id, { sort_order: i })
+    }
+  })
+  triggerPush()
 }
 
 // Un-links without deleting the child item itself — it becomes independent.

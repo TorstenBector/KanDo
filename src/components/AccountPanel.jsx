@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
 import { useSyncStore } from '../store/syncStore'
+import SetPasswordModal from './SetPasswordModal'
 import { theme } from '../theme'
 
 export default function AccountPanel() {
@@ -9,9 +10,7 @@ export default function AccountPanel() {
   const [mode, setMode] = useState('magiclink') // 'magiclink' | 'password'
   const [email, setEmail] = useState('')
   const [password, setPasswordInput] = useState('')
-  const [showSetPassword, setShowSetPassword] = useState(false)
-  const [newPassword, setNewPassword] = useState('')
-  const [setPasswordMessage, setSetPasswordMessage] = useState(null)
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false)
 
   const session = useSyncStore((s) => s.session)
   const syncing = useSyncStore((s) => s.syncing)
@@ -19,7 +18,6 @@ export default function AccountPanel() {
   const authMessage = useSyncStore((s) => s.authMessage)
   const sendMagicLink = useSyncStore((s) => s.sendMagicLink)
   const signInWithPassword = useSyncStore((s) => s.signInWithPassword)
-  const setPassword = useSyncStore((s) => s.setPassword)
   const signOut = useSyncStore((s) => s.signOut)
   const sync = useSyncStore((s) => s.sync)
 
@@ -36,19 +34,6 @@ export default function AccountPanel() {
   async function handlePasswordLogin() {
     if (!email.trim() || !password) return
     await signInWithPassword(email.trim(), password)
-  }
-
-  async function handleSetPassword() {
-    if (newPassword.length < 6) {
-      setSetPasswordMessage('Minst 6 tecken.')
-      return
-    }
-    const { error } = await setPassword(newPassword)
-    setSetPasswordMessage(error ? `Fel: ${error.message}` : 'Lösenord sparat.')
-    if (!error) {
-      setNewPassword('')
-      setShowSetPassword(false)
-    }
   }
 
   return (
@@ -116,30 +101,9 @@ export default function AccountPanel() {
                 <button onClick={() => signOut()} style={secondaryBtn}>Logga ut</button>
               </div>
 
-              <button
-                onClick={() => setShowSetPassword((s) => !s)}
-                style={{ ...miniLinkBtn, marginBottom: showSetPassword ? '0.4rem' : 0 }}
-              >
-                {showSetPassword ? '– Dölj' : '+ Sätt lösenord (slipp mejla länk nästa gång)'}
+              <button onClick={() => setPasswordModalOpen(true)} style={miniLinkBtn}>
+                + Sätt lösenord (slipp mejla länk nästa gång)
               </button>
-              {showSetPassword && (
-                <>
-                  <input
-                    type="password"
-                    autoComplete="new-password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    placeholder="Nytt lösenord (minst 6 tecken)"
-                    style={{ ...inputStyle, marginBottom: '0.4rem' }}
-                  />
-                  <button onClick={handleSetPassword} style={primaryBtn}>Spara lösenord</button>
-                </>
-              )}
-              {setPasswordMessage && (
-                <p style={{ color: theme.colors.textMuted, fontSize: '0.75rem', marginTop: '0.4rem' }}>
-                  {setPasswordMessage}
-                </p>
-              )}
             </>
           ) : (
             <>
@@ -199,6 +163,8 @@ export default function AccountPanel() {
           )}
         </div>
       )}
+
+      <SetPasswordModal open={passwordModalOpen} onClose={() => setPasswordModalOpen(false)} />
     </div>
   )
 }

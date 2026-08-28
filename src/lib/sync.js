@@ -20,11 +20,15 @@ export async function pushPendingChanges(userId) {
   if (!userId) return
 
   const pendingItems = await db.items.filter((i) => i._syncStatus === 'pending').toArray()
+  const itemErrors = []
   for (const item of pendingItems) {
     const { _syncStatus, ...row } = item
     const { error } = await supabase.from('items').upsert({ ...row, user_id: userId })
     if (error) {
-      throw new Error(`Kunde inte synka "${item.title}": ${error.message}`)
+      // Don't let one bad row block every other pending item in the batch —
+      // skip it (stays 'pending', retried next sync) and keep going.
+      itemErrors.push(`"${item.title}": ${error.message}`)
+      continue
     }
     await db.items.update(item.id, { _syncStatus: 'synced' })
   }
@@ -34,7 +38,7 @@ export async function pushPendingChanges(userId) {
   const localTags = await db.tags.where('user_id').equals(userId).toArray()
   if (localTags.length > 0) {
     const { error } = await supabase.from('tags').upsert(localTags)
-    if (error) throw new Error(`Kunde inte synka taggar: ${error.message}`)
+    if (error) itemErrors.push(`taggar: ${error.message}`)
   }
 
   const localItemIds = (await db.items.where('user_id').equals(userId).primaryKeys())
@@ -42,8 +46,17 @@ export async function pushPendingChanges(userId) {
     const links = await db.item_tags.where('item_id').anyOf(localItemIds).toArray()
     if (links.length > 0) {
       const { error } = await supabase.from('item_tags').upsert(links)
-      if (error) throw new Error(`Kunde inte synka taggkopplingar: ${error.message}`)
+      if (error) itemErrors.push(`taggkopplingar: ${error.message}`)
     }
+  }
+
+  // Everything that *could* sync did; report what couldn't rather than
+  // blocking the whole batch on the first failure.
+  if (itemErrors.length > 0) {
+    const summary = itemErrors.length === 1
+      ? itemErrors[0]
+      : `${itemErrors.length} objekt kunde inte synkas, t.ex. ${itemErrors[0]}`
+    throw new Error(summary)
   }
 }
 

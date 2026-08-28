@@ -125,6 +125,18 @@ export async function togglePrioritized(id) {
   }
 }
 
+// Self-heals a schema drift: 'idea' used to be a valid status (merged into
+// Backlog on 2026-08-27, see spec.md "Kanban"). The server was migrated,
+// but any device with old unsynced local items still had status: 'idea'
+// sitting in its own IndexedDB — those failed the server's check constraint
+// the moment they tried to push. Runs on app load, cheap no-op once clean.
+export async function migrateLegacyItemStatus() {
+  const stale = await db.items.filter((i) => i.status === 'idea').toArray()
+  for (const item of stale) {
+    await updateItem(item.id, { status: 'backlog' })
+  }
+}
+
 // Recurring items marked done reappear in Backlog once their frequency
 // elapses, instead of staying in Utförda forever. Runs on app load — this
 // is a local-first app with no server cron, so "due" is checked whenever

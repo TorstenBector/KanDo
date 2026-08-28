@@ -9,7 +9,7 @@ import AccountPanel from './components/AccountPanel'
 import RegistrationScreen from './components/RegistrationScreen'
 import { useSyncStore } from './store/syncStore'
 import { useProfile } from './hooks/useProfile'
-import { reactivateDueRecurringItems } from './hooks/useItems'
+import { reactivateDueRecurringItems, migrateLegacyItemStatus } from './hooks/useItems'
 import { theme } from './theme'
 
 const TABS = [
@@ -27,8 +27,14 @@ export default function KandoApp() {
   const { profile, loading: profileLoading, saveProfile } = useProfile(session)
 
   useEffect(() => {
-    initSync()
-    reactivateDueRecurringItems()
+    // Local data repairs run before the first sync attempt, so a stale
+    // record doesn't get pushed and rejected before it's been fixed.
+    async function boot() {
+      await migrateLegacyItemStatus()
+      await reactivateDueRecurringItems()
+      initSync()
+    }
+    boot()
   }, [initSync])
 
   // First-time users (logged in, no profile row yet) see the registration

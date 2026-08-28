@@ -94,11 +94,32 @@ function PrioRow({ item, rank }) {
         {rank}
       </span>
 
-      <div {...attributes} {...listeners} style={{ flex: 1, cursor: 'grab', touchAction: 'none' }}>
+      <div style={{ flex: 1 }}>
         <div style={{ fontSize: '0.65rem', color: theme.colors.textMuted, textTransform: 'uppercase' }}>
           {TYPE_LABEL[item.type]}
         </div>
         <div style={{ color: theme.colors.text, fontWeight: 500 }}>{item.title}</div>
+      </div>
+
+      <div
+        {...attributes}
+        {...listeners}
+        title="Dra för att ändra ordning"
+        style={{
+          flexShrink: 0,
+          width: '1.75rem',
+          height: '1.75rem',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'grab',
+          touchAction: 'none',
+          color: theme.colors.textMuted,
+          fontSize: '1.1rem',
+          letterSpacing: '-1px',
+        }}
+      >
+        ⠿
       </div>
 
       <button

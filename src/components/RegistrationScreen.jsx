@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { theme } from '../theme'
 
-export default function RegistrationScreen({ email, onSave }) {
+export default function RegistrationScreen({ email, onSave, onSetPassword }) {
   const [alias, setAlias] = useState('')
   const [phone, setPhone] = useState('')
+  const [password, setPassword] = useState('')
   const [error, setError] = useState(null)
   const [saving, setSaving] = useState(false)
 
@@ -13,11 +14,27 @@ export default function RegistrationScreen({ email, onSave }) {
       setError('Alias krävs.')
       return
     }
+    if (password && password.length < 6) {
+      setError('Lösenordet måste vara minst 6 tecken (eller lämna tomt).')
+      return
+    }
     setSaving(true)
     setError(null)
     const { error: saveError } = await onSave({ alias: alias.trim(), phone: phone.trim() })
+    if (saveError) {
+      setSaving(false)
+      setError(saveError.message)
+      return
+    }
+    if (password) {
+      const { error: pwError } = await onSetPassword(password)
+      if (pwError) {
+        setSaving(false)
+        setError(`Profil sparad, men lösenordet gick inte att sätta: ${pwError.message}`)
+        return
+      }
+    }
     setSaving(false)
-    if (saveError) setError(saveError.message)
   }
 
   return (
@@ -60,6 +77,20 @@ export default function RegistrationScreen({ email, onSave }) {
               onChange={(e) => setPhone(e.target.value)}
               placeholder="07X-XXX XX XX"
               type="tel"
+              style={inputStyle}
+            />
+          </label>
+
+          <label style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+            <span style={{ fontSize: '0.85rem', color: theme.colors.text, fontWeight: 500 }}>
+              Lösenord <span style={{ color: theme.colors.textMuted, fontWeight: 400 }}>(valfritt — slipp mejla länk nästa gång)</span>
+            </span>
+            <input
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Minst 6 tecken"
+              type="password"
+              autoComplete="new-password"
               style={inputStyle}
             />
           </label>

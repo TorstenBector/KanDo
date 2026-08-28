@@ -24,6 +24,7 @@ export default function KandoApp() {
   const [tab, setTab] = useState('fokus')
   const initSync = useSyncStore((s) => s.init)
   const session = useSyncStore((s) => s.session)
+  const setPassword = useSyncStore((s) => s.setPassword)
   const { profile, loading: profileLoading, saveProfile } = useProfile(session)
 
   useEffect(() => {
@@ -41,7 +42,7 @@ export default function KandoApp() {
   // screen instead of the app. Local-first use with no login is unaffected —
   // this only gates the moment right after a first successful magic-link login.
   if (session && !profileLoading && profile === null) {
-    return <RegistrationScreen email={session.user.email} onSave={saveProfile} />
+    return <RegistrationScreen email={session.user.email} onSave={saveProfile} onSetPassword={setPassword} />
   }
 
   return (

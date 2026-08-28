@@ -37,6 +37,21 @@ export const useSyncStore = create((set, get) => ({
     return !error
   },
 
+  // Same persisted-session mechanism as magic link (Supabase client keeps
+  // both logged in the same way) — the point of a password is skipping the
+  // email round-trip on a *new* device, not "staying logged in" itself.
+  async signInWithPassword(email, password) {
+    set({ authMessage: null })
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) set({ authMessage: `Fel: ${error.message}` })
+    return !error
+  },
+
+  async setPassword(password) {
+    const { error } = await supabase.auth.updateUser({ password })
+    return { error }
+  },
+
   async signOut() {
     await supabase.auth.signOut()
     set({ session: null })

@@ -37,7 +37,6 @@ export default function PrioListView() {
 
   return (
     <div style={{ padding: '1rem' }}>
-      <h2 style={{ color: theme.colors.text, margin: '0 0 0.25rem' }}>Prioriterad</h2>
       <p style={{ color: theme.colors.textMuted, fontSize: '0.9rem', margin: '0 0 1rem' }}>
         Dra för att ändra ordning. Översta är viktigast.
       </p>

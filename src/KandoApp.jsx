@@ -76,9 +76,10 @@ export default function KandoApp() {
         </div>
         <div
           style={{
-            padding: '0 1rem 0.6rem',
-            fontSize: '0.8rem',
-            color: theme.colors.accentSoft,
+            padding: '0 1rem 0.7rem',
+            fontSize: '1.3rem',
+            fontWeight: 700,
+            color: theme.colors.textOnPrimary,
           }}
         >
           {currentTabLabel}

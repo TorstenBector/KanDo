@@ -55,14 +55,10 @@ export default function DagensFokus() {
 
   return (
     <div style={{ padding: '1rem' }}>
-      <h2 style={{ color: theme.colors.text, margin: '0 0 0.25rem' }}>
-        {isToday ? 'Dagens Fokus' : formatDateLabel(selectedDate)}
-      </h2>
-
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 0 0.75rem' }}>
         <button onClick={() => setSelectedDate(addDaysISO(selectedDate, -1))} style={dateNavBtn}>‹</button>
-        <span style={{ color: theme.colors.textMuted, fontSize: '0.85rem', minWidth: '7rem', textAlign: 'center' }}>
-          {isToday ? 'Schemalagt idag' : selectedDate}
+        <span style={{ color: theme.colors.text, fontSize: '0.9rem', fontWeight: 600, minWidth: '9rem', textAlign: 'center' }}>
+          {isToday ? 'Schemalagt idag' : formatDateLabel(selectedDate)}
         </span>
         <button onClick={() => setSelectedDate(addDaysISO(selectedDate, 1))} style={dateNavBtn}>›</button>
         {!isToday && (

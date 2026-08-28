@@ -82,8 +82,6 @@ export default function UtfordaView() {
 
   return (
     <div style={{ padding: '1rem' }}>
-      <h2 style={{ color: theme.colors.text, margin: '0 0 1rem' }}>Utförda</h2>
-
       {items.length === 0 && (
         <p style={{ color: theme.colors.textMuted }}>Inget klarmarkerat än.</p>
       )}

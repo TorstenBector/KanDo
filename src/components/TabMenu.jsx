@@ -12,14 +12,25 @@ export default function TabMenu({ tabs, tab, setTab }) {
         style={{
           background: 'transparent',
           border: 'none',
-          color: theme.colors.textOnPrimary,
           cursor: 'pointer',
-          fontSize: '1.3rem',
-          lineHeight: 1,
-          padding: '0.1rem 0.3rem',
+          padding: '0.4rem',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '4px',
         }}
       >
-        ☰
+        {[0, 1, 2].map((i) => (
+          <span
+            key={i}
+            style={{
+              display: 'block',
+              width: '22px',
+              height: '3px',
+              borderRadius: '2px',
+              background: theme.colors.textOnPrimary,
+            }}
+          />
+        ))}
       </button>
 
       {open && (

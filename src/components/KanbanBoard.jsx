@@ -43,7 +43,12 @@ export default function KanbanBoard() {
   const columnsData = useMemo(() => {
     const map = {}
     for (const col of COLUMNS) {
-      const colItems = visibleItems.filter((i) => i.status === col.id)
+      // Klar only shows items actively pulled into the board (dragged here
+      // at some point) — otherwise every quick checkmark from Dagens Fokus/
+      // Backlog/Prio would clutter it. Those still show in Utförda either way.
+      const colItems = visibleItems.filter(
+        (i) => i.status === col.id && (col.id !== 'klar' || i.kanban_entered)
+      )
       if (col.id === 'prioriterad') {
         colItems.sort((a, b) => (a.priority_rank ?? 999999) - (b.priority_rank ?? 999999))
       } else {
@@ -68,7 +73,9 @@ export default function KanbanBoard() {
     const destStatus = overColumn ? overColumn.id : overItem ? overItem.status : activeItem.status
 
     if (destStatus !== activeItem.status) {
-      const changes = { status: destStatus }
+      // Any drag within the board marks it as actively tracked here — this
+      // is what lets it show in Klar later instead of being filtered out.
+      const changes = { status: destStatus, kanban_entered: true }
       if (destStatus === 'prioriterad') {
         changes.priority_rank = columnsData.prioriterad.length
       }

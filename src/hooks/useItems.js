@@ -47,6 +47,7 @@ export async function createItem({ type, title, original_text = null, descriptio
     recurrence_days: null,
     next_due_date: null,
     last_completed_at: null,
+    kanban_entered: false,
     created_at: now,
     updated_at: now,
     _syncStatus: 'pending',

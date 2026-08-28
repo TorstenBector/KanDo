@@ -1,5 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
+import { supabase } from '../lib/supabaseClient'
 import { useSyncStore } from '../store/syncStore'
 
 function triggerPush() {
@@ -85,6 +86,16 @@ export async function deleteItem(id) {
   await db.item_tags.where('item_id').equals(id).delete()
   await db.item_relations.where('from_item_id').equals(id).delete()
   await db.item_relations.where('to_item_id').equals(id).delete()
+  // Upsert-based sync can't express "this is gone" — tell the server
+  // directly, best-effort. If offline, the row lingers remotely until
+  // deleted again while online; local state is already correct either way.
+  const session = useSyncStore.getState().session
+  if (session) {
+    supabase.from('items').delete().eq('id', id).then(
+      () => {},
+      () => {} // best-effort; local delete already stands regardless
+    )
+  }
 }
 
 export async function reorderPrioritized(orderedIds) {
@@ -106,6 +117,13 @@ export async function scheduleToday(id) {
 
 export async function unschedule(id) {
   await updateItem(id, { scheduled_date: null })
+}
+
+// Full reset to Backlog — for items pulled into Dagens Fokus (or
+// Prioriterad) too early. Unlike unschedule(), also drops status back to
+// backlog and clears priority_rank, not just the date.
+export async function sendToBacklog(id) {
+  await updateItem(id, { status: 'backlog', scheduled_date: null, priority_rank: null })
 }
 
 export async function setRecurrence(id, days) {
@@ -136,6 +154,83 @@ export async function migrateLegacyItemStatus() {
   for (const item of stale) {
     await updateItem(item.id, { status: 'backlog' })
   }
+}
+
+// Full copy as a starting point for "turns out it's actually three of
+// these" — same type/title/description/priority/recurrence/tags, but
+// always lands fresh in Backlog (not wherever the original currently is).
+export async function cloneItem(id) {
+  const original = await db.items.get(id)
+  if (!original) return
+  const clone = await createItem({
+    type: original.type,
+    title: original.title,
+    description: original.description,
+  })
+  await updateItem(clone.id, { backlog_priority: original.backlog_priority, recurrence_days: original.recurrence_days })
+
+  const links = await db.item_tags.where('item_id').equals(id).toArray()
+  for (const link of links) {
+    await db.item_tags.put({ item_id: clone.id, tag_id: link.tag_id })
+  }
+  triggerPush()
+  return clone
+}
+
+// Children default to the parent's current status/type — the common case
+// (splitting a Prioriterad task into parts) means they immediately show up
+// grouped in the same place, without a separate re-triage step.
+export async function addChildItem(parentId, title) {
+  const parent = await db.items.get(parentId)
+  if (!parent) return
+  const child = await createItem({ type: parent.type, title })
+  await updateItem(child.id, { status: parent.status })
+
+  const userId = useSyncStore.getState().session?.user?.id ?? null
+  await db.item_relations.add({
+    id: crypto.randomUUID(),
+    user_id: userId,
+    from_item_id: parentId,
+    to_item_id: child.id,
+    relation_type: 'parent_child',
+    created_at: new Date().toISOString(),
+  })
+  triggerPush()
+  return child
+}
+
+// Un-links without deleting the child item itself — it becomes independent.
+export async function removeChildRelation(parentId, childId) {
+  await db.item_relations
+    .where({ from_item_id: parentId, to_item_id: childId, relation_type: 'parent_child' })
+    .delete()
+  const session = useSyncStore.getState().session
+  if (session) {
+    supabase.from('item_relations')
+      .delete()
+      .match({ from_item_id: parentId, to_item_id: childId, relation_type: 'parent_child' })
+      .then(() => {}, () => {})
+  }
+}
+
+// Marking a parent done while it still has open children needs an explicit
+// yes — otherwise it's too easy to lose track of unfinished subtasks.
+export async function markDoneWithConfirm(id) {
+  const relations = await db.item_relations.where('from_item_id').equals(id).toArray()
+  const childRelations = relations.filter((r) => r.relation_type === 'parent_child')
+  if (childRelations.length > 0) {
+    const children = (await db.items.bulkGet(childRelations.map((r) => r.to_item_id))).filter(Boolean)
+    const incomplete = children.filter((c) => c.status !== 'klar')
+    if (incomplete.length > 0) {
+      const noun = incomplete.length === 1 ? 'deluppgift' : 'deluppgifter'
+      const ok = window.confirm(
+        `Den här KanDo'n har ${incomplete.length} ej klarmarkerad${incomplete.length === 1 ? '' : 'e'} ${noun}. Markera alla som klara?`
+      )
+      if (!ok) return
+      for (const child of incomplete) await markDone(child.id)
+    }
+  }
+  await markDone(id)
 }
 
 // Recurring items marked done reappear in Backlog once their frequency

@@ -1,5 +1,6 @@
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
+import { useSyncStore } from '../store/syncStore'
 
 export function useTags(kind) {
   return useLiveQuery(async () => {
@@ -26,13 +27,15 @@ export async function findOrCreateTag(name, kind = 'category') {
     .filter((t) => t.kind === kind && t.name.toLowerCase() === trimmed.toLowerCase())
     .first()
   if (existing) return existing
+  const userId = useSyncStore.getState().session?.user?.id ?? null
   const tag = {
     id: crypto.randomUUID(),
-    user_id: null,
+    user_id: userId,
     name: trimmed,
     kind,
     created_at: new Date().toISOString(),
   }
   await db.tags.add(tag)
+  useSyncStore.getState().pushOnly()
   return tag
 }

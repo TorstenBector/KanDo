@@ -50,6 +50,12 @@ export async function pushPendingChanges(userId) {
     }
   }
 
+  const localRelations = await db.item_relations.where('user_id').equals(userId).toArray()
+  if (localRelations.length > 0) {
+    const { error } = await supabase.from('item_relations').upsert(localRelations)
+    if (error) itemErrors.push(`relationer: ${error.message}`)
+  }
+
   // Everything that *could* sync did; report what couldn't rather than
   // blocking the whole batch on the first failure.
   if (itemErrors.length > 0) {
@@ -77,6 +83,9 @@ export async function pullRemoteChanges(userId) {
   // RLS scopes this to the caller's own items automatically.
   const { data: remoteLinks } = await supabase.from('item_tags').select('item_id, tag_id')
   if (remoteLinks?.length) await db.item_tags.bulkPut(remoteLinks)
+
+  const { data: remoteRelations } = await supabase.from('item_relations').select('*').eq('user_id', userId)
+  if (remoteRelations?.length) await db.item_relations.bulkPut(remoteRelations)
 }
 
 export async function runFullSync(userId) {

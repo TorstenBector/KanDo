@@ -1,18 +1,27 @@
+import { useMemo, useState } from 'react'
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core'
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
-import { markDone, reorderPrioritized, togglePrioritized } from '../hooks/useItems'
+import { markDoneWithConfirm, reorderPrioritized, togglePrioritized } from '../hooks/useItems'
+import { useChildrenByParent } from '../hooks/useRelations'
+import ItemDetailModal from './ItemDetailModal'
 import { theme } from '../theme'
 
 const TYPE_LABEL = { idea: 'Idé', project: 'Projekt', task: 'Task' }
 
 export default function PrioListView() {
-  const items = useLiveQuery(async () => {
+  const [detailItemId, setDetailItemId] = useState(null)
+  const { childrenByParent, childIdSet } = useChildrenByParent()
+  const allItems = useLiveQuery(async () => {
     const all = await db.items.where('status').equals('prioriterad').toArray()
     return all.sort((a, b) => (a.priority_rank ?? 999999) - (b.priority_rank ?? 999999))
   }, []) ?? []
+
+  // Children are presented grouped under their parent, not as independently
+  // draggable rows — see spec discussion: "presenteras ihop i Backlog och Prio".
+  const items = useMemo(() => allItems.filter((i) => !childIdSet.has(i.id)), [allItems, childIdSet])
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
@@ -43,16 +52,25 @@ export default function PrioListView() {
         <SortableContext items={items.map((i) => i.id)} strategy={verticalListSortingStrategy}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
             {items.map((item, index) => (
-              <PrioRow key={item.id} item={item} rank={index + 1} />
+              <div key={item.id}>
+                <PrioRow item={item} rank={index + 1} onOpenDetail={setDetailItemId} />
+                {(childrenByParent.get(item.id) ?? []).map((child) => (
+                  <div key={child.id} style={{ marginLeft: '1.5rem', marginTop: '0.5rem' }}>
+                    <ChildRow item={child} onOpenDetail={setDetailItemId} />
+                  </div>
+                ))}
+              </div>
             ))}
           </div>
         </SortableContext>
       </DndContext>
+
+      <ItemDetailModal itemId={detailItemId} onClose={() => setDetailItemId(null)} />
     </div>
   )
 }
 
-function PrioRow({ item, rank }) {
+function PrioRow({ item, rank, onOpenDetail }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id })
 
   const style = {
@@ -72,7 +90,7 @@ function PrioRow({ item, rank }) {
   return (
     <div ref={setNodeRef} style={style}>
       <button
-        onClick={() => markDone(item.id)}
+        onClick={() => markDoneWithConfirm(item.id)}
         title="Markera som klar"
         style={{
           border: `1.5px solid ${theme.colors.border}`,
@@ -94,7 +112,7 @@ function PrioRow({ item, rank }) {
         {rank}
       </span>
 
-      <div style={{ flex: 1 }}>
+      <div onClick={() => onOpenDetail(item.id)} style={{ flex: 1, cursor: 'pointer' }}>
         <div style={{ fontSize: '0.65rem', color: theme.colors.textMuted, textTransform: 'uppercase' }}>
           {TYPE_LABEL[item.type]}
         </div>
@@ -139,6 +157,53 @@ function PrioRow({ item, rank }) {
       >
         ← Backlog
       </button>
+    </div>
+  )
+}
+
+function ChildRow({ item, onOpenDetail }) {
+  const done = item.status === 'klar'
+  return (
+    <div
+      style={{
+        background: theme.colors.surface,
+        border: `1px solid ${theme.colors.border}`,
+        borderRadius: theme.radius.sm,
+        padding: '0.5rem 0.7rem',
+        boxShadow: theme.shadow.sm,
+        display: 'flex',
+        alignItems: 'center',
+        gap: '0.5rem',
+      }}
+    >
+      <button
+        onClick={() => markDoneWithConfirm(item.id)}
+        title="Markera som klar"
+        style={{
+          border: `1.5px solid ${theme.colors.success}`,
+          background: done ? theme.colors.success : theme.colors.bg,
+          borderRadius: '50%',
+          width: '1.1rem',
+          height: '1.1rem',
+          flexShrink: 0,
+          cursor: 'pointer',
+          padding: 0,
+          color: done ? '#fff' : theme.colors.success,
+          fontSize: '0.7rem',
+        }}
+      >
+        ✓
+      </button>
+      <span
+        onClick={() => onOpenDetail(item.id)}
+        style={{
+          flex: 1, cursor: 'pointer', fontSize: '0.9rem',
+          color: done ? theme.colors.textMuted : theme.colors.text,
+          textDecoration: done ? 'line-through' : 'none',
+        }}
+      >
+        {item.title}
+      </span>
     </div>
   )
 }

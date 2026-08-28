@@ -6,6 +6,7 @@ import { db } from '../lib/db'
 import { updateItem, reorderPrioritized } from '../hooks/useItems'
 import { useTags } from '../hooks/useTags'
 import KanbanColumn from './KanbanColumn'
+import ItemDetailModal from './ItemDetailModal'
 import { theme } from '../theme'
 
 // Status changes automatically when a card moves column; manual order
@@ -22,6 +23,7 @@ const COLUMNS = [
 
 export default function KanbanBoard() {
   const [laneFilter, setLaneFilter] = useState('all')
+  const [detailItemId, setDetailItemId] = useState(null)
   const items = useLiveQuery(() => db.items.toArray(), []) ?? []
   const itemTagLinks = useLiveQuery(() => db.item_tags.toArray(), []) ?? []
   const categoryTags = useTags('category') ?? []
@@ -118,10 +120,12 @@ export default function KanbanBoard() {
       <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
         <div style={{ display: 'flex', gap: '0.75rem', overflowX: 'auto' }}>
           {COLUMNS.map((col) => (
-            <KanbanColumn key={col.id} column={col} items={columnsData[col.id]} />
+            <KanbanColumn key={col.id} column={col} items={columnsData[col.id]} onOpenDetail={setDetailItemId} />
           ))}
         </div>
       </DndContext>
+
+      <ItemDetailModal itemId={detailItemId} onClose={() => setDetailItemId(null)} />
     </div>
   )
 }

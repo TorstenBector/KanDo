@@ -1,14 +1,16 @@
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { markDone } from '../hooks/useItems'
+import { markDoneWithConfirm } from '../hooks/useItems'
+import { useParent } from '../hooks/useRelations'
 import { theme } from '../theme'
 
 const TYPE_LABEL = { idea: 'Idé', project: 'Projekt', task: 'Task' }
 const PRIORITY_LABEL = { hog: 'Hög', medel: 'Medel', lag: 'Låg' }
 const PRIORITY_COLOR = { hog: theme.colors.danger, medel: theme.colors.warning, lag: theme.colors.textMuted }
 
-export default function ItemCard({ item }) {
+export default function ItemCard({ item, onOpenDetail }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id })
+  const parent = useParent(item.id)
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -30,7 +32,7 @@ export default function ItemCard({ item }) {
         <button
           onClick={(e) => {
             e.stopPropagation()
-            markDone(item.id)
+            markDoneWithConfirm(item.id)
           }}
           onPointerDown={(e) => e.stopPropagation()}
           title="Markera som klar"
@@ -57,12 +59,35 @@ export default function ItemCard({ item }) {
           {TYPE_LABEL[item.type]}
         </div>
         <div style={{ color: theme.colors.text, fontWeight: 500 }}>{item.title}</div>
+        {parent && (
+          <div style={{ fontSize: '0.65rem', color: theme.colors.textMuted, marginTop: '0.15rem' }}>
+            ↳ {parent.title}
+          </div>
+        )}
         {item.backlog_priority && (
           <div style={{ fontSize: '0.7rem', color: PRIORITY_COLOR[item.backlog_priority], marginTop: '0.25rem' }}>
             ● {PRIORITY_LABEL[item.backlog_priority]}
           </div>
         )}
       </div>
+      <button
+        onClick={(e) => {
+          e.stopPropagation()
+          onOpenDetail(item.id)
+        }}
+        onPointerDown={(e) => e.stopPropagation()}
+        title="Öppna detaljer"
+        style={{
+          border: 'none',
+          background: 'transparent',
+          color: theme.colors.textMuted,
+          cursor: 'pointer',
+          fontSize: '0.8rem',
+          flexShrink: 0,
+        }}
+      >
+        ✎
+      </button>
     </div>
   )
 }

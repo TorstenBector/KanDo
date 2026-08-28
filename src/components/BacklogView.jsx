@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
-import { updateItem, deleteItem, markDone, scheduleToday, unschedule, setRecurrence, togglePrioritized } from '../hooks/useItems'
+import { updateItem, deleteItem, markDoneWithConfirm, scheduleToday, unschedule, setRecurrence, togglePrioritized } from '../hooks/useItems'
 import { findOrCreateTag, useItemTags } from '../hooks/useTags'
+import { useChildrenByParent } from '../hooks/useRelations'
+import ItemDetailModal from './ItemDetailModal'
 import { theme } from '../theme'
 
 const TYPE_TABS = [
@@ -32,6 +34,8 @@ function todayISO() {
 
 export default function BacklogView() {
   const [typeFilter, setTypeFilter] = useState('all')
+  const [detailItemId, setDetailItemId] = useState(null)
+  const { childrenByParent, childIdSet } = useChildrenByParent()
   const items = useLiveQuery(
     async () => {
       const all = await db.items.orderBy('created_at').reverse().toArray()
@@ -45,6 +49,9 @@ export default function BacklogView() {
     () => (typeFilter === 'all' ? items : items.filter((i) => i.type === typeFilter)),
     [items, typeFilter]
   )
+  // Children render nested under their parent instead of as separate
+  // top-level rows — see spec discussion: "presenteras ihop i Backlog".
+  const topLevel = useMemo(() => visible.filter((i) => !childIdSet.has(i.id)), [visible, childIdSet])
 
   return (
     <div style={{ padding: '1rem' }}>
@@ -69,18 +76,27 @@ export default function BacklogView() {
       </div>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-        {visible.map((item) => (
-          <BacklogItemRow key={item.id} item={item} />
+        {topLevel.map((item) => (
+          <div key={item.id}>
+            <BacklogItemRow item={item} onOpenDetail={setDetailItemId} />
+            {(childrenByParent.get(item.id) ?? []).map((child) => (
+              <div key={child.id} style={{ marginLeft: '1.5rem', marginTop: '0.5rem' }}>
+                <BacklogItemRow item={child} onOpenDetail={setDetailItemId} />
+              </div>
+            ))}
+          </div>
         ))}
-        {visible.length === 0 && (
+        {topLevel.length === 0 && (
           <p style={{ color: theme.colors.textMuted }}>Tomt här. Använd Snabbfånga för att lägga till något.</p>
         )}
       </div>
+
+      <ItemDetailModal itemId={detailItemId} onClose={() => setDetailItemId(null)} />
     </div>
   )
 }
 
-function BacklogItemRow({ item }) {
+function BacklogItemRow({ item, onOpenDetail }) {
   const [tagInput, setTagInput] = useState('')
   const [customRecurrence, setCustomRecurrence] = useState(false)
   const tags = useItemTags(item.id) ?? []
@@ -121,7 +137,7 @@ function BacklogItemRow({ item }) {
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
         <button
-          onClick={() => markDone(item.id)}
+          onClick={() => markDoneWithConfirm(item.id)}
           title="Markera som klar"
           style={{
             border: `1.5px solid ${theme.colors.border}`,
@@ -191,6 +207,14 @@ function BacklogItemRow({ item }) {
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
         </select>
+        <button
+          onClick={() => onOpenDetail(item.id)}
+          aria-label="Redigera"
+          title="Öppna detaljer"
+          style={{ border: 'none', background: 'transparent', color: theme.colors.textMuted, cursor: 'pointer', fontSize: '0.9rem' }}
+        >
+          ✎
+        </button>
         <button
           onClick={() => deleteItem(item.id)}
           aria-label="Ta bort"

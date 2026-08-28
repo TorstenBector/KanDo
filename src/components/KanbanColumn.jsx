@@ -3,7 +3,7 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import ItemCard from './ItemCard'
 import { theme } from '../theme'
 
-export default function KanbanColumn({ column, items }) {
+export default function KanbanColumn({ column, items, onOpenDetail }) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id })
 
   return (
@@ -24,7 +24,7 @@ export default function KanbanColumn({ column, items }) {
       <SortableContext items={items.map((i) => i.id)} strategy={verticalListSortingStrategy}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', minHeight: '40px' }}>
           {items.map((item) => (
-            <ItemCard key={item.id} item={item} />
+            <ItemCard key={item.id} item={item} onOpenDetail={onOpenDetail} />
           ))}
         </div>
       </SortableContext>

@@ -6,7 +6,9 @@ import PrioListView from './components/PrioListView'
 import KanbanBoard from './components/KanbanBoard'
 import UtfordaView from './components/UtfordaView'
 import AccountPanel from './components/AccountPanel'
+import RegistrationScreen from './components/RegistrationScreen'
 import { useSyncStore } from './store/syncStore'
+import { useProfile } from './hooks/useProfile'
 import { reactivateDueRecurringItems } from './hooks/useItems'
 import { theme } from './theme'
 
@@ -21,11 +23,20 @@ const TABS = [
 export default function KandoApp() {
   const [tab, setTab] = useState('fokus')
   const initSync = useSyncStore((s) => s.init)
+  const session = useSyncStore((s) => s.session)
+  const { profile, loading: profileLoading, saveProfile } = useProfile(session)
 
   useEffect(() => {
     initSync()
     reactivateDueRecurringItems()
   }, [initSync])
+
+  // First-time users (logged in, no profile row yet) see the registration
+  // screen instead of the app. Local-first use with no login is unaffected —
+  // this only gates the moment right after a first successful magic-link login.
+  if (session && !profileLoading && profile === null) {
+    return <RegistrationScreen email={session.user.email} onSave={saveProfile} />
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: theme.colors.bg }}>

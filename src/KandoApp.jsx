@@ -6,6 +6,7 @@ import PrioListView from './components/PrioListView'
 import KanbanBoard from './components/KanbanBoard'
 import UtfordaView from './components/UtfordaView'
 import AccountPanel from './components/AccountPanel'
+import TabMenu from './components/TabMenu'
 import RegistrationScreen from './components/RegistrationScreen'
 import { useSyncStore } from './store/syncStore'
 import { useProfile } from './hooks/useProfile'
@@ -45,51 +46,44 @@ export default function KandoApp() {
     return <RegistrationScreen email={session.user.email} onSave={saveProfile} onSetPassword={setPassword} />
   }
 
+  const currentTabLabel = TABS.find((t) => t.id === tab)?.label ?? ''
+
   return (
     <div style={{ minHeight: '100vh', background: theme.colors.bg }}>
       <header
         style={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 150,
           background: theme.colors.primary,
           color: theme.colors.textOnPrimary,
-          padding: '0.75rem 1rem',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
+          boxShadow: theme.shadow.md,
         }}
       >
-        <strong style={{ fontSize: '1.1rem' }}>KanDo</strong>
-        <AccountPanel />
+        <div
+          style={{
+            padding: '0.75rem 1rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
+          <strong style={{ fontSize: '1.1rem' }}>KanDo</strong>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+            <AccountPanel />
+            <TabMenu tabs={TABS} tab={tab} setTab={setTab} />
+          </div>
+        </div>
+        <div
+          style={{
+            padding: '0 1rem 0.6rem',
+            fontSize: '0.8rem',
+            color: theme.colors.accentSoft,
+          }}
+        >
+          {currentTabLabel}
+        </div>
       </header>
-
-      <nav
-        style={{
-          display: 'flex',
-          overflowX: 'auto',
-          borderBottom: `1px solid ${theme.colors.border}`,
-          background: theme.colors.surface,
-        }}
-      >
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
-            style={{
-              flex: '0 0 auto',
-              whiteSpace: 'nowrap',
-              padding: '0.65rem 0.9rem',
-              border: 'none',
-              background: 'transparent',
-              borderBottom: tab === t.id ? `3px solid ${theme.colors.primary}` : '3px solid transparent',
-              color: tab === t.id ? theme.colors.text : theme.colors.textMuted,
-              fontWeight: tab === t.id ? 600 : 400,
-              cursor: 'pointer',
-              fontSize: '0.9rem',
-            }}
-          >
-            {t.label}
-          </button>
-        ))}
-      </nav>
 
       <main style={{ paddingBottom: '5rem' }}>
         {tab === 'fokus' && <DagensFokus />}

@@ -5,6 +5,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
 import { updateItem, reorderPrioritized } from '../hooks/useItems'
 import { useTags } from '../hooks/useTags'
+import { useChildrenByParent } from '../hooks/useRelations'
 import KanbanColumn from './KanbanColumn'
 import ItemDetailModal from './ItemDetailModal'
 import { theme } from '../theme'
@@ -27,6 +28,7 @@ export default function KanbanBoard() {
   const items = useLiveQuery(() => db.items.toArray(), []) ?? []
   const itemTagLinks = useLiveQuery(() => db.item_tags.toArray(), []) ?? []
   const categoryTags = useTags('category') ?? []
+  const { childIdSet } = useChildrenByParent()
 
   const tagIdsByItemId = useMemo(() => {
     const map = new Map()
@@ -48,8 +50,12 @@ export default function KanbanBoard() {
       // Klar only shows items actively pulled into the board (dragged here
       // at some point) — otherwise every quick checkmark from Dagens Fokus/
       // Backlog/Prio would clutter it. Those still show in Utförda either way.
+      // Children don't get their own top-level card here — dragging them
+      // across a narrow/mobile board separately from their parent was the
+      // whole problem being solved; instead they're nested under the parent
+      // (see ItemCard's expand toggle) with a direct status control.
       const colItems = visibleItems.filter(
-        (i) => i.status === col.id && (col.id !== 'klar' || i.kanban_entered)
+        (i) => i.status === col.id && !childIdSet.has(i.id) && (col.id !== 'klar' || i.kanban_entered)
       )
       if (col.id === 'prioriterad') {
         colItems.sort((a, b) => (a.priority_rank ?? 999999) - (b.priority_rank ?? 999999))
@@ -59,7 +65,7 @@ export default function KanbanBoard() {
       map[col.id] = colItems
     }
     return map
-  }, [visibleItems])
+  }, [visibleItems, childIdSet])
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 

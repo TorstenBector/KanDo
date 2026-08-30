@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
 import { markDoneWithConfirm, reopenItem, sendToBacklog } from '../hooks/useItems'
@@ -7,6 +7,7 @@ import { theme } from '../theme'
 
 const TYPE_LABEL = { idea: 'Idé', project: 'Projekt', task: 'Task' }
 const COLLAPSE_THRESHOLD = 3
+const PRIORITY_WEIGHT = { hog: 0, medel: 1, lag: 2 }
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10)
@@ -24,10 +25,21 @@ function formatDateLabel(iso) {
   return label.charAt(0).toUpperCase() + label.slice(1)
 }
 
+// Default order: backlog_priority (Hög/Medel/Låg) first, then position in
+// the Prio list within each tier — a composite of both attributes rather
+// than either alone.
+function byPriorityThenRank(a, b) {
+  const aWeight = a.backlog_priority ? PRIORITY_WEIGHT[a.backlog_priority] : 3
+  const bWeight = b.backlog_priority ? PRIORITY_WEIGHT[b.backlog_priority] : 3
+  if (aWeight !== bWeight) return aWeight - bWeight
+  return (a.priority_rank ?? 999999) - (b.priority_rank ?? 999999)
+}
+
 export default function DagensFokus() {
   const [showDone, setShowDone] = useState(false)
   const [detailItemId, setDetailItemId] = useState(null)
   const [selectedDate, setSelectedDate] = useState(todayISO())
+  const [groupByTag, setGroupByTag] = useState(false)
   const isToday = selectedDate === todayISO()
 
   const scheduled = useLiveQuery(async () => {
@@ -40,22 +52,64 @@ export default function DagensFokus() {
   const topPriority = useLiveQuery(async () => {
     if (!isToday) return []
     const all = await db.items.where('status').equals('prioriterad').toArray()
-    return all
-      .sort((a, b) => (a.priority_rank ?? 999999) - (b.priority_rank ?? 999999))
-      .slice(0, 5)
+    return all.sort(byPriorityThenRank).slice(0, 5)
   }, [isToday])
 
   const showScheduled = (scheduled?.length ?? 0) > 0
   const rawList = showScheduled ? scheduled : (topPriority ?? [])
 
-  const byPriority = (a, b) => (a.priority_rank ?? 999999) - (b.priority_rank ?? 999999)
-  const activeItems = rawList.filter((i) => i.status !== 'klar').sort(byPriority)
-  const doneItems = rawList.filter((i) => i.status === 'klar').sort(byPriority)
+  const activeItems = useMemo(
+    () => rawList.filter((i) => i.status !== 'klar').sort(byPriorityThenRank),
+    [rawList]
+  )
+  const doneItems = useMemo(
+    () => rawList.filter((i) => i.status === 'klar').sort(byPriorityThenRank),
+    [rawList]
+  )
   const collapseDone = doneItems.length > COLLAPSE_THRESHOLD
+
+  // "Har jag flera Ute, vill jag se alla uppgifter jag bör göra innan jag
+  // går in" — group active items by tag instead of a flat priority list.
+  const activeIds = useMemo(() => activeItems.map((i) => i.id), [activeItems])
+  const tagsByItemId = useLiveQuery(async () => {
+    if (!groupByTag || activeIds.length === 0) return new Map()
+    const links = await db.item_tags.where('item_id').anyOf(activeIds).toArray()
+    const tagIds = [...new Set(links.map((l) => l.tag_id))]
+    const tags = await db.tags.bulkGet(tagIds)
+    const tagById = new Map(tags.filter(Boolean).map((t) => [t.id, t]))
+    const map = new Map()
+    for (const link of links) {
+      const tag = tagById.get(link.tag_id)
+      if (!tag) continue
+      if (!map.has(link.item_id)) map.set(link.item_id, [])
+      map.get(link.item_id).push(tag)
+    }
+    return map
+  }, [groupByTag, activeIds])
+
+  const tagGroups = useMemo(() => {
+    if (!groupByTag || !tagsByItemId) return null
+    const groups = new Map() // tagId -> { tag, items: [] }
+    const untagged = []
+    for (const item of activeItems) {
+      const tags = tagsByItemId.get(item.id) ?? []
+      if (tags.length === 0) {
+        untagged.push(item)
+        continue
+      }
+      for (const tag of tags) {
+        if (!groups.has(tag.id)) groups.set(tag.id, { tag, items: [] })
+        groups.get(tag.id).items.push(item)
+      }
+    }
+    const sorted = [...groups.values()].sort((a, b) => a.tag.name.localeCompare(b.tag.name, 'sv'))
+    if (untagged.length > 0) sorted.push({ tag: null, items: untagged })
+    return sorted
+  }, [groupByTag, tagsByItemId, activeItems])
 
   return (
     <div style={{ padding: '1rem' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 0 0.75rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 0 0.5rem' }}>
         <button onClick={() => setSelectedDate(addDaysISO(selectedDate, -1))} style={dateNavBtn}>‹</button>
         <span style={{ color: theme.colors.text, fontSize: '0.9rem', fontWeight: 600, minWidth: '9rem', textAlign: 'center' }}>
           {isToday ? 'Schemalagt idag' : formatDateLabel(selectedDate)}
@@ -66,10 +120,25 @@ export default function DagensFokus() {
             Idag
           </button>
         )}
+        <button
+          onClick={() => setGroupByTag((g) => !g)}
+          style={{
+            marginLeft: 'auto',
+            border: `1px solid ${groupByTag ? theme.colors.primary : theme.colors.border}`,
+            background: groupByTag ? theme.colors.primary : theme.colors.surface,
+            color: groupByTag ? theme.colors.textOnPrimary : theme.colors.text,
+            borderRadius: theme.radius.sm,
+            padding: '0.35rem 0.6rem',
+            fontSize: '0.8rem',
+            cursor: 'pointer',
+          }}
+        >
+          🏷 Gruppera efter tagg
+        </button>
       </div>
 
       {isToday && !showScheduled && (
-        <p style={{ color: theme.colors.textMuted, fontSize: '0.85rem', margin: '-0.5rem 0 0.75rem' }}>
+        <p style={{ color: theme.colors.textMuted, fontSize: '0.85rem', margin: '0 0 0.75rem' }}>
           Inget schemalagt idag — de fem högst prioriterade
         </p>
       )}
@@ -144,9 +213,24 @@ export default function DagensFokus() {
           </>
         )}
 
-        {activeItems.map((item) => (
-          <FocusRow key={item.id} item={item} showScheduled={showScheduled} onOpenDetail={setDetailItemId} />
-        ))}
+        {groupByTag && tagGroups ? (
+          tagGroups.map(({ tag, items }) => (
+            <div key={tag?.id ?? 'untagged'} style={{ marginTop: '0.5rem' }}>
+              <h3 style={{ color: theme.colors.textMuted, fontSize: '0.8rem', textTransform: 'uppercase', margin: '0 0 0.4rem' }}>
+                {tag ? `${tag.kind === 'context' ? '📍 ' : ''}${tag.name}` : 'Otaggat'} ({items.length})
+              </h3>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {items.map((item) => (
+                  <FocusRow key={item.id} item={item} showScheduled={showScheduled} onOpenDetail={setDetailItemId} />
+                ))}
+              </div>
+            </div>
+          ))
+        ) : (
+          activeItems.map((item) => (
+            <FocusRow key={item.id} item={item} showScheduled={showScheduled} onOpenDetail={setDetailItemId} />
+          ))
+        )}
       </div>
 
       <ItemDetailModal itemId={detailItemId} onClose={() => setDetailItemId(null)} />

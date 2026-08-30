@@ -12,18 +12,27 @@ export const useSyncStore = create((set, get) => ({
 
   setOnline: (isOnline) => set({ isOnline }),
 
+  // claimLocalData reclaims any local item/tag with user_id: null for the
+  // current account. Deliberately run on *every* boot/auth event, not just
+  // "was logged out before" — it's cheap and idempotent once clean, and a
+  // one-time-only trigger left tags stuck orphaned forever if they were
+  // created while a bug set user_id: null even though already logged in
+  // (that bug is fixed now, but this makes any such leftover self-heal
+  // instead of silently never syncing across devices again).
   async init() {
     const { data } = await supabase.auth.getSession()
     set({ session: data.session })
-    if (data.session) get().sync()
+    if (data.session) {
+      await claimLocalData(data.session.user.id)
+      get().sync()
+    }
 
     supabase.auth.onAuthStateChange(async (_event, session) => {
-      const wasLoggedOut = !get().session
       set({ session })
-      if (session && wasLoggedOut) {
+      if (session) {
         await claimLocalData(session.user.id)
+        get().sync()
       }
-      if (session) get().sync()
     })
   },
 

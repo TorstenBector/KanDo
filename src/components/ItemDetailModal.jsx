@@ -7,6 +7,7 @@ import { db } from '../lib/db'
 import {
   updateItem, deleteItem, cloneItem, setRecurrence,
   addChildItem, removeChildRelation, reorderChildren, markDoneWithConfirm,
+  pauseItem, resumeItem,
 } from '../hooks/useItems'
 import { findOrCreateTag, useItemTags } from '../hooks/useTags'
 import { useChildren, useParent } from '../hooks/useRelations'
@@ -25,6 +26,18 @@ const RECURRENCE_PRESETS = [
   { value: '14', label: '🔁 Var 14:e dag' },
   { value: 'custom', label: '🔁 Anpassat…' },
 ]
+const PAUSE_PRESETS = [
+  { months: 1, label: '1 månad' },
+  { months: 3, label: '3 månader' },
+  { months: 4, label: '4 månader' },
+  { months: 6, label: '6 månader' },
+]
+
+function addMonthsISO(months) {
+  const d = new Date()
+  d.setMonth(d.getMonth() + months)
+  return d.toISOString().slice(0, 10)
+}
 
 export default function ItemDetailModal({ itemId, onClose }) {
   const item = useLiveQuery(() => (itemId ? db.items.get(itemId) : undefined), [itemId])
@@ -196,6 +209,31 @@ export default function ItemDetailModal({ itemId, onClose }) {
               onKeyDown={(e) => e.key === 'Enter' && e.target.blur()}
               style={{ ...inputStyle, width: '110px' }}
             />
+          )}
+        </div>
+
+        <label style={labelStyle}>Bibliotek (pausa till)</label>
+        <div style={{ marginBottom: '0.75rem' }}>
+          {item.paused_until ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.85rem', color: theme.colors.text }}>
+                🗄 Pausad till <strong>{item.paused_until}</strong>
+              </span>
+              <button onClick={() => resumeItem(item.id)} style={secondaryBtn}>Återuppta nu</button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
+              {PAUSE_PRESETS.map((p) => (
+                <button key={p.months} onClick={() => pauseItem(item.id, addMonthsISO(p.months))} style={secondaryBtn}>
+                  {p.label}
+                </button>
+              ))}
+              <input
+                type="date"
+                onChange={(e) => e.target.value && pauseItem(item.id, e.target.value)}
+                style={{ ...inputStyle, width: 'auto' }}
+              />
+            </div>
           )}
         </div>
 

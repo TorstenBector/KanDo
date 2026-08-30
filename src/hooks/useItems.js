@@ -49,6 +49,7 @@ export async function createItem({ type, title, original_text = null, descriptio
     next_due_date: null,
     last_completed_at: null,
     kanban_entered: false,
+    paused_until: null,
     created_at: now,
     updated_at: now,
     _syncStatus: 'pending',
@@ -269,5 +270,28 @@ export async function reactivateDueRecurringItems() {
       next_due_date: null,
       scheduled_date: null, // stale from the previous cycle, not this one
     })
+  }
+}
+
+// "Backlog Arkiv" — pause an item out of the way until a future date
+// (specific measurements for a build starting next spring, say) instead of
+// scrolling past it in Backlog every day.
+export async function pauseItem(id, untilDateISO) {
+  await updateItem(id, { paused_until: untilDateISO })
+}
+
+export async function resumeItem(id) {
+  await updateItem(id, { paused_until: null })
+}
+
+// Same on-load pattern as reactivateDueRecurringItems — no server cron,
+// so "due" is checked whenever a device happens to open the app.
+export async function reactivatePausedItems() {
+  const today = todayISO()
+  const due = await db.items
+    .filter((i) => !!i.paused_until && i.paused_until <= today)
+    .toArray()
+  for (const item of due) {
+    await updateItem(item.id, { paused_until: null })
   }
 }

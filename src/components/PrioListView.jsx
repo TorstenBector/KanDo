@@ -11,9 +11,14 @@ import { theme } from '../theme'
 
 const TYPE_LABEL = { idea: 'Idé', project: 'Projekt', task: 'Task' }
 
-export default function PrioListView() {
+export default function PrioListView({ tagFilter }) {
   const [detailItemId, setDetailItemId] = useState(null)
   const { childrenByParent, childIdSet } = useChildrenByParent()
+  const taggedItemIds = useLiveQuery(async () => {
+    if (!tagFilter) return null
+    const links = await db.item_tags.where('tag_id').equals(tagFilter).toArray()
+    return new Set(links.map((l) => l.item_id))
+  }, [tagFilter])
   const allItems = useLiveQuery(async () => {
     const all = await db.items.where('status').equals('prioriterad').toArray()
     return all.sort((a, b) => (a.priority_rank ?? 999999) - (b.priority_rank ?? 999999))
@@ -21,7 +26,11 @@ export default function PrioListView() {
 
   // Children are presented grouped under their parent, not as independently
   // draggable rows — see spec discussion: "presenteras ihop i Backlog och Prio".
-  const items = useMemo(() => allItems.filter((i) => !childIdSet.has(i.id)), [allItems, childIdSet])
+  const items = useMemo(() => {
+    let result = allItems.filter((i) => !childIdSet.has(i.id))
+    if (tagFilter && taggedItemIds) result = result.filter((i) => taggedItemIds.has(i.id))
+    return result
+  }, [allItems, childIdSet, tagFilter, taggedItemIds])
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 

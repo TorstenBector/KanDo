@@ -24,8 +24,8 @@ export default function TabMenu({ tabs, tab, setTab }) {
             key={i}
             style={{
               display: 'block',
-              width: '22px',
-              height: '3px',
+              width: '28px',
+              height: '4px',
               borderRadius: '2px',
               background: theme.colors.textOnPrimary,
             }}

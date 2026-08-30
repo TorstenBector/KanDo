@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
-import { updateItem, deleteItem, markDoneWithConfirm, scheduleToday, unschedule, setRecurrence, togglePrioritized } from '../hooks/useItems'
+import { updateItem, deleteItem, markDoneWithConfirm, scheduleToday, unschedule, setRecurrence, togglePrioritized, resumeItem } from '../hooks/useItems'
 import { findOrCreateTag, useItemTags } from '../hooks/useTags'
 import { useChildrenByParent } from '../hooks/useRelations'
 import ItemDetailModal from './ItemDetailModal'
@@ -32,11 +32,17 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10)
 }
 
-export default function BacklogView() {
+export default function BacklogView({ tagFilter }) {
   const [typeFilter, setTypeFilter] = useState('all')
   const [detailItemId, setDetailItemId] = useState(null)
+  const [showPaused, setShowPaused] = useState(false)
   const { childrenByParent, childIdSet } = useChildrenByParent()
-  const items = useLiveQuery(
+  const taggedItemIds = useLiveQuery(async () => {
+    if (!tagFilter) return null
+    const links = await db.item_tags.where('tag_id').equals(tagFilter).toArray()
+    return new Set(links.map((l) => l.item_id))
+  }, [tagFilter])
+  const allItems = useLiveQuery(
     async () => {
       const all = await db.items.orderBy('created_at').reverse().toArray()
       // Completed items move to the Utförda tab instead of lingering here.
@@ -45,10 +51,17 @@ export default function BacklogView() {
     []
   ) ?? []
 
-  const visible = useMemo(
-    () => (typeFilter === 'all' ? items : items.filter((i) => i.type === typeFilter)),
-    [items, typeFilter]
-  )
+  // Paused ("Bibliotek") items stay out of the main list entirely until
+  // their date passes — see pauseItem/reactivatePausedItems.
+  const today = todayISO()
+  const items = useMemo(() => allItems.filter((i) => !(i.paused_until && i.paused_until > today)), [allItems, today])
+  const pausedItems = useMemo(() => allItems.filter((i) => i.paused_until && i.paused_until > today), [allItems, today])
+
+  const visible = useMemo(() => {
+    let result = typeFilter === 'all' ? items : items.filter((i) => i.type === typeFilter)
+    if (tagFilter && taggedItemIds) result = result.filter((i) => taggedItemIds.has(i.id))
+    return result
+  }, [items, typeFilter, tagFilter, taggedItemIds])
   // Children render nested under their parent instead of as separate
   // top-level rows — see spec discussion: "presenteras ihop i Backlog".
   const topLevel = useMemo(() => visible.filter((i) => !childIdSet.has(i.id)), [visible, childIdSet])
@@ -90,6 +103,57 @@ export default function BacklogView() {
           <p style={{ color: theme.colors.textMuted }}>Tomt här. Använd Snabbfånga för att lägga till något.</p>
         )}
       </div>
+
+      {pausedItems.length > 0 && (
+        <div style={{ marginTop: '1.25rem' }}>
+          <button
+            onClick={() => setShowPaused((s) => !s)}
+            style={{
+              background: theme.colors.surface,
+              border: `1px solid ${theme.colors.border}`,
+              borderRadius: theme.radius.sm,
+              padding: '0.5rem 0.8rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              cursor: 'pointer',
+              width: '100%',
+              textAlign: 'left',
+              color: theme.colors.text,
+            }}
+          >
+            <span style={{ fontSize: '1rem' }}>🗄</span>
+            <span style={{ fontWeight: 700 }}>Pausade ({pausedItems.length})</span>
+            <span style={{ marginLeft: 'auto', fontSize: '1.2rem', color: theme.colors.textMuted }}>
+              {showPaused ? '⌃' : '⌄'}
+            </span>
+          </button>
+
+          {showPaused && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+              {pausedItems.map((item) => (
+                <div
+                  key={item.id}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '0.6rem',
+                    background: theme.colors.surface, border: `1px solid ${theme.colors.border}`,
+                    borderRadius: theme.radius.sm, padding: '0.6rem 0.8rem',
+                  }}
+                >
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: '0.65rem', color: theme.colors.textMuted, textTransform: 'uppercase' }}>
+                      Pausad till {item.paused_until}
+                    </div>
+                    <div style={{ color: theme.colors.text, fontWeight: 500 }}>{item.title}</div>
+                  </div>
+                  <button onClick={() => resumeItem(item.id)} style={miniBtn}>Återuppta</button>
+                  <button onClick={() => setDetailItemId(item.id)} title="Öppna detaljer" style={{ ...miniBtn, textDecoration: 'none' }}>✎</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       <ItemDetailModal itemId={detailItemId} onClose={() => setDetailItemId(null)} />
     </div>
@@ -211,7 +275,17 @@ function BacklogItemRow({ item, onOpenDetail }) {
           onClick={() => onOpenDetail(item.id)}
           aria-label="Redigera"
           title="Öppna detaljer"
-          style={{ border: 'none', background: 'transparent', color: theme.colors.textMuted, cursor: 'pointer', fontSize: '0.9rem' }}
+          style={{
+            border: `1px solid ${theme.colors.border}`,
+            background: theme.colors.bg,
+            borderRadius: theme.radius.sm,
+            color: theme.colors.text,
+            cursor: 'pointer',
+            fontSize: '1.05rem',
+            width: '1.9rem',
+            height: '1.9rem',
+            flexShrink: 0,
+          }}
         >
           ✎
         </button>

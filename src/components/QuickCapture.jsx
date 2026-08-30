@@ -29,8 +29,8 @@ export default function QuickCapture() {
         aria-label="Snabbfånga"
         style={{
           position: 'fixed',
-          bottom: '1.5rem',
-          right: '1.5rem',
+          bottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))',
+          right: 'calc(1.5rem + env(safe-area-inset-right, 0px))',
           width: '3.5rem',
           height: '3.5rem',
           borderRadius: '50%',
@@ -41,7 +41,7 @@ export default function QuickCapture() {
           fontSize: '1.75rem',
           lineHeight: 1,
           cursor: 'pointer',
-          zIndex: 50,
+          zIndex: 250,
         }}
       >
         +

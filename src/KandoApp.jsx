@@ -7,10 +7,11 @@ import KanbanBoard from './components/KanbanBoard'
 import UtfordaView from './components/UtfordaView'
 import AccountPanel from './components/AccountPanel'
 import TabMenu from './components/TabMenu'
+import TagFilterButton from './components/TagFilterButton'
 import RegistrationScreen from './components/RegistrationScreen'
 import { useSyncStore } from './store/syncStore'
 import { useProfile } from './hooks/useProfile'
-import { reactivateDueRecurringItems, migrateLegacyItemStatus } from './hooks/useItems'
+import { reactivateDueRecurringItems, reactivatePausedItems, migrateLegacyItemStatus } from './hooks/useItems'
 import { theme } from './theme'
 
 const TABS = [
@@ -23,6 +24,7 @@ const TABS = [
 
 export default function KandoApp() {
   const [tab, setTab] = useState('fokus')
+  const [tagFilter, setTagFilter] = useState(null)
   const initSync = useSyncStore((s) => s.init)
   const session = useSyncStore((s) => s.session)
   const setPassword = useSyncStore((s) => s.setPassword)
@@ -34,6 +36,7 @@ export default function KandoApp() {
     async function boot() {
       await migrateLegacyItemStatus()
       await reactivateDueRecurringItems()
+      await reactivatePausedItems()
       initSync()
     }
     boot()
@@ -71,6 +74,9 @@ export default function KandoApp() {
           <strong style={{ fontSize: '1.1rem' }}>KanDo</strong>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <AccountPanel />
+            {(tab === 'backlog' || tab === 'prio') && (
+              <TagFilterButton tagFilter={tagFilter} setTagFilter={setTagFilter} />
+            )}
             <TabMenu tabs={TABS} tab={tab} setTab={setTab} />
           </div>
         </div>
@@ -88,8 +94,8 @@ export default function KandoApp() {
 
       <main style={{ paddingBottom: '5rem' }}>
         {tab === 'fokus' && <DagensFokus />}
-        {tab === 'backlog' && <BacklogView />}
-        {tab === 'prio' && <PrioListView />}
+        {tab === 'backlog' && <BacklogView tagFilter={tagFilter} />}
+        {tab === 'prio' && <PrioListView tagFilter={tagFilter} />}
         {tab === 'kanban' && <KanbanBoard />}
         {tab === 'utforda' && <UtfordaView />}
       </main>

@@ -56,6 +56,20 @@ export async function pushPendingChanges(userId) {
     if (error) itemErrors.push(`relationer: ${error.message}`)
   }
 
+  // Images get their own dirty-flag (like items) rather than the tags-style
+  // "upsert everything every cycle" — each row carries a full base64 image,
+  // so re-uploading every existing photo on every sync would be wasteful.
+  const pendingImages = await db.item_images.filter((i) => i._syncStatus === 'pending').toArray()
+  for (const image of pendingImages) {
+    const { _syncStatus, ...row } = image
+    const { error } = await supabase.from('item_images').upsert({ ...row, user_id: userId })
+    if (error) {
+      itemErrors.push(`bild: ${error.message}`)
+      continue
+    }
+    await db.item_images.update(image.id, { _syncStatus: 'synced' })
+  }
+
   // Everything that *could* sync did; report what couldn't rather than
   // blocking the whole batch on the first failure.
   if (itemErrors.length > 0) {
@@ -86,6 +100,21 @@ export async function pullRemoteChanges(userId) {
 
   const { data: remoteRelations } = await supabase.from('item_relations').select('*').eq('user_id', userId)
   if (remoteRelations?.length) await db.item_relations.bulkPut(remoteRelations)
+
+  // Images are immutable once created (only added/removed, never edited),
+  // so only fetch the ones we don't already have locally — re-downloading
+  // every existing photo's base64 content on every sync would be wasteful.
+  const { data: remoteImageIds } = await supabase.from('item_images').select('id').eq('user_id', userId)
+  if (remoteImageIds?.length) {
+    const localIds = new Set(await db.item_images.toCollection().primaryKeys())
+    const missingIds = remoteImageIds.map((r) => r.id).filter((id) => !localIds.has(id))
+    if (missingIds.length > 0) {
+      const { data: fullImages } = await supabase.from('item_images').select('*').in('id', missingIds)
+      if (fullImages?.length) {
+        await db.item_images.bulkPut(fullImages.map((img) => ({ ...img, _syncStatus: 'synced' })))
+      }
+    }
+  }
 }
 
 export async function runFullSync(userId) {

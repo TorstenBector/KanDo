@@ -87,6 +87,7 @@ export async function deleteItem(id) {
   await db.item_tags.where('item_id').equals(id).delete()
   await db.item_relations.where('from_item_id').equals(id).delete()
   await db.item_relations.where('to_item_id').equals(id).delete()
+  await db.item_images.where('item_id').equals(id).delete()
   // Upsert-based sync can't express "this is gone" — tell the server
   // directly, best-effort. If offline, the row lingers remotely until
   // deleted again while online; local state is already correct either way.

@@ -11,6 +11,7 @@ import {
 } from '../hooks/useItems'
 import { findOrCreateTag, useItemTags } from '../hooks/useTags'
 import { useChildren, useParent } from '../hooks/useRelations'
+import { useItemImages, addImage, removeImage } from '../hooks/useImages'
 import { theme } from '../theme'
 
 const TYPE_LABEL = { idea: 'Idé', project: 'Projekt', task: 'Task' }
@@ -44,10 +45,24 @@ export default function ItemDetailModal({ itemId, onClose }) {
   const tags = useItemTags(itemId)
   const children = useChildren(itemId)
   const parent = useParent(itemId)
+  const images = useItemImages(itemId)
   const [tagInput, setTagInput] = useState('')
   const [childInput, setChildInput] = useState('')
   const [customRecurrence, setCustomRecurrence] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
+
+  async function handleImageSelect(e) {
+    const file = e.target.files?.[0]
+    e.target.value = '' // allow picking the same file again
+    if (!file) return
+    setUploading(true)
+    try {
+      await addImage(itemId, file)
+    } finally {
+      setUploading(false)
+    }
+  }
 
   if (!itemId || !item) return null
 
@@ -160,8 +175,48 @@ export default function ItemDetailModal({ itemId, onClose }) {
           onChange={(e) => updateItem(item.id, { description: e.target.value })}
           placeholder="Lägg till detaljer, kontext, anteckningar…"
           rows={4}
-          style={{ ...inputStyle, width: '100%', resize: 'vertical', fontFamily: 'inherit', marginBottom: '0.75rem' }}
+          style={{ ...inputStyle, width: '100%', resize: 'vertical', fontFamily: 'inherit', marginBottom: '0.5rem' }}
         />
+
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
+          {images.map((img) => (
+            <div key={img.id} style={{ position: 'relative' }}>
+              <a href={img.data_url} target="_blank" rel="noreferrer">
+                <img
+                  src={img.data_url}
+                  alt=""
+                  style={{
+                    width: '4.5rem', height: '4.5rem', objectFit: 'cover',
+                    borderRadius: theme.radius.sm, border: `1px solid ${theme.colors.border}`, display: 'block',
+                  }}
+                />
+              </a>
+              <button
+                onClick={() => removeImage(img.id)}
+                title="Ta bort bild"
+                style={{
+                  position: 'absolute', top: '-6px', right: '-6px',
+                  width: '1.2rem', height: '1.2rem', borderRadius: '50%',
+                  border: 'none', background: theme.colors.danger, color: '#fff',
+                  fontSize: '0.7rem', cursor: 'pointer', lineHeight: 1, padding: 0,
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          ))}
+          <label
+            style={{
+              width: '4.5rem', height: '4.5rem', borderRadius: theme.radius.sm,
+              border: `1px dashed ${theme.colors.border}`, display: 'flex',
+              alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+              color: theme.colors.textMuted, fontSize: '0.7rem', textAlign: 'center',
+            }}
+          >
+            {uploading ? '…' : '📷 +'}
+            <input type="file" accept="image/*" onChange={handleImageSelect} style={{ display: 'none' }} disabled={uploading} />
+          </label>
+        </div>
 
         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
           <div>

@@ -8,4 +8,5 @@ db.version(1).stores({
   tags: 'id, user_id, kind, name',
   item_tags: '[item_id+tag_id], item_id, tag_id',
   spec_versions: 'id, item_id, version_date',
+  item_images: 'id, user_id, item_id, created_at, _syncStatus',
 })

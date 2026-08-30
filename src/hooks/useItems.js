@@ -253,6 +253,29 @@ export async function markDoneWithConfirm(id) {
     }
   }
   await markDone(id)
+  // Mirror image of the check above: a subtask can be dragged/completed
+  // independently anywhere in the app (Kanban included), so completing the
+  // *last* remaining sibling should offer to close out the parent too,
+  // instead of leaving it silently open with nothing left to do.
+  await maybeOfferToCompleteParent(id)
+}
+
+async function maybeOfferToCompleteParent(childId) {
+  const parentRelation = await db.item_relations
+    .where({ to_item_id: childId, relation_type: 'parent_child' })
+    .first()
+  if (!parentRelation) return
+  const parent = await db.items.get(parentRelation.from_item_id)
+  if (!parent || parent.status === 'klar') return
+
+  const siblingRelations = await db.item_relations
+    .where({ from_item_id: parent.id, relation_type: 'parent_child' })
+    .toArray()
+  const siblings = (await db.items.bulkGet(siblingRelations.map((r) => r.to_item_id))).filter(Boolean)
+  if (siblings.length === 0 || !siblings.every((s) => s.status === 'klar')) return
+
+  const ok = window.confirm(`Alla deluppgifter för "${parent.title}" är klara. Markera "${parent.title}" som klar också?`)
+  if (ok) await markDoneWithConfirm(parent.id)
 }
 
 // Recurring items marked done reappear in Backlog once their frequency

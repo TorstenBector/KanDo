@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core'
-import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { SortableContext, arrayMove, useSortable, rectSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
@@ -57,8 +57,8 @@ export default function PrioListView({ tagFilter }) {
       )}
 
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext items={items.map((i) => i.id)} strategy={verticalListSortingStrategy}>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <SortableContext items={items.map((i) => i.id)} strategy={rectSortingStrategy}>
+          <div style={itemGridStyle}>
             {items.map((item, index) => (
               <div key={item.id}>
                 <PrioRow item={item} rank={index + 1} onOpenDetail={setDetailItemId} />
@@ -167,6 +167,16 @@ function PrioRow({ item, rank, onOpenDetail }) {
       </button>
     </div>
   )
+}
+
+// Wide desktop screens get several cards side by side instead of one row
+// stretched edge-to-edge; narrow/mobile viewports naturally collapse to a
+// single column since there's no room for a second 340px card.
+const itemGridStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
+  gap: '0.75rem',
+  alignItems: 'start',
 }
 
 function ChildRow({ item, onOpenDetail }) {

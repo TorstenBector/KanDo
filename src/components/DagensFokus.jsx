@@ -207,9 +207,11 @@ export default function DagensFokus() {
                 – Dölj utförda
               </button>
             )}
-            {doneItems.map((item) => (
-              <FocusRow key={item.id} item={item} showScheduled={showScheduled} onOpenDetail={setDetailItemId} />
-            ))}
+            <div style={itemGridStyle}>
+              {doneItems.map((item) => (
+                <FocusRow key={item.id} item={item} showScheduled={showScheduled} onOpenDetail={setDetailItemId} />
+              ))}
+            </div>
           </>
         )}
 
@@ -219,7 +221,7 @@ export default function DagensFokus() {
               <h3 style={{ color: theme.colors.textMuted, fontSize: '0.8rem', textTransform: 'uppercase', margin: '0 0 0.4rem' }}>
                 {tag ? `${tag.kind === 'context' ? '📍 ' : ''}${tag.name}` : 'Otaggat'} ({items.length})
               </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              <div style={itemGridStyle}>
                 {items.map((item) => (
                   <FocusRow key={item.id} item={item} showScheduled={showScheduled} onOpenDetail={setDetailItemId} />
                 ))}
@@ -227,9 +229,11 @@ export default function DagensFokus() {
             </div>
           ))
         ) : (
-          activeItems.map((item) => (
-            <FocusRow key={item.id} item={item} showScheduled={showScheduled} onOpenDetail={setDetailItemId} />
-          ))
+          <div style={itemGridStyle}>
+            {activeItems.map((item) => (
+              <FocusRow key={item.id} item={item} showScheduled={showScheduled} onOpenDetail={setDetailItemId} />
+            ))}
+          </div>
         )}
       </div>
 
@@ -306,6 +310,16 @@ function FocusRow({ item, showScheduled, onOpenDetail }) {
       )}
     </div>
   )
+}
+
+// Wide desktop screens get several cards side by side instead of one row
+// stretched edge-to-edge; narrow/mobile viewports naturally collapse to a
+// single column since there's no room for a second 340px card.
+const itemGridStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
+  gap: '0.75rem',
+  alignItems: 'start',
 }
 
 const dateNavBtn = {

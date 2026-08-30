@@ -92,7 +92,7 @@ export default function UtfordaView() {
             <h3 style={{ color: theme.colors.textMuted, fontSize: '0.8rem', textTransform: 'uppercase', margin: '0 0 0.5rem' }}>
               {label}
             </h3>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+            <div style={itemGridStyle}>
               {groupItems.map((item) => (
                 <CompletedRow key={item.id} item={item} />
               ))}
@@ -221,7 +221,7 @@ function BrowseHistory({ items }) {
       )}
 
       {expandedWeek && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+        <div style={itemGridStyle}>
           {weekItems.map((item) => (
             <CompletedRow key={item.id} item={item} />
           ))}
@@ -229,6 +229,16 @@ function BrowseHistory({ items }) {
       )}
     </div>
   )
+}
+
+// Wide desktop screens get several cards side by side instead of one row
+// stretched edge-to-edge; narrow/mobile viewports naturally collapse to a
+// single column since there's no room for a second 340px card.
+const itemGridStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
+  gap: '0.75rem',
+  alignItems: 'start',
 }
 
 const chip = {

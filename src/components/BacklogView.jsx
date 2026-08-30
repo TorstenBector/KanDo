@@ -88,7 +88,7 @@ export default function BacklogView({ tagFilter }) {
         ))}
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      <div style={itemGridStyle}>
         {topLevel.map((item) => (
           <div key={item.id}>
             <BacklogItemRow item={item} onOpenDetail={setDetailItemId} />
@@ -130,7 +130,7 @@ export default function BacklogView({ tagFilter }) {
           </button>
 
           {showPaused && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+            <div style={{ ...itemGridStyle, marginTop: '0.5rem' }}>
               {pausedItems.map((item) => (
                 <div
                   key={item.id}
@@ -421,4 +421,14 @@ const miniBtn = {
   color: theme.colors.primary,
   cursor: 'pointer',
   textDecoration: 'underline',
+}
+
+// Wide desktop screens get several cards side by side instead of one row
+// stretched edge-to-edge; narrow/mobile viewports naturally collapse to a
+// single column since there's no room for a second 340px card.
+const itemGridStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
+  gap: '0.75rem',
+  alignItems: 'start',
 }

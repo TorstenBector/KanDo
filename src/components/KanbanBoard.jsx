@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { DndContext, PointerSensor, closestCorners, useSensor, useSensors } from '@dnd-kit/core'
+import { DndContext, PointerSensor, closestCenter, pointerWithin, useSensor, useSensors } from '@dnd-kit/core'
 import { arrayMove } from '@dnd-kit/sortable'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
@@ -63,6 +63,21 @@ export default function KanbanBoard() {
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
+  // closestCorners compares the dragged rect's corners against every
+  // droppable's corners — for a tall/empty column (few or no cards) that
+  // means its own corners sit far from wherever the pointer actually is,
+  // while a *small* card in a neighboring column can look "closer" purely
+  // by corner distance even though the pointer is nowhere near it. That's
+  // what caused cards to keep snapping back into Prioriterad (usually the
+  // tallest, most populated column) instead of landing in the column the
+  // pointer was actually over. pointerWithin checks literal containment
+  // first — far more reliable for "which column is this over" — falling
+  // back to closestCenter only for fine-grained reorder-within-a-column.
+  function collisionDetection(args) {
+    const pointerCollisions = pointerWithin(args)
+    return pointerCollisions.length > 0 ? pointerCollisions : closestCenter(args)
+  }
+
   async function handleDragEnd(event) {
     const { active, over } = event
     if (!over) return
@@ -117,7 +132,7 @@ export default function KanbanBoard() {
         </select>
       </div>
 
-      <DndContext sensors={sensors} collisionDetection={closestCorners} onDragEnd={handleDragEnd}>
+      <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragEnd={handleDragEnd}>
         <div style={{ display: 'flex', gap: '0.75rem', overflowX: 'auto' }}>
           {COLUMNS.map((col) => (
             <KanbanColumn key={col.id} column={col} items={columnsData[col.id]} onOpenDetail={setDetailItemId} />

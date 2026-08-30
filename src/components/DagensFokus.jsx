@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
 import { markDoneWithConfirm, reopenItem, sendToBacklog } from '../hooks/useItems'
+import { useChildrenByParent } from '../hooks/useRelations'
 import ItemDetailModal from './ItemDetailModal'
 import { theme } from '../theme'
 
@@ -40,6 +41,16 @@ export default function DagensFokus() {
   const [detailItemId, setDetailItemId] = useState(null)
   const [selectedDate, setSelectedDate] = useState(todayISO())
   const [groupByTag, setGroupByTag] = useState(false)
+  // Parents with children start expanded (matches the previous
+  // always-shown behavior) — collapsing is an opt-in per parent.
+  const [collapsedParents, setCollapsedParents] = useState(() => new Set())
+  const toggleParent = (id) =>
+    setCollapsedParents((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  const { childrenByParent } = useChildrenByParent()
   const isToday = selectedDate === todayISO()
 
   const scheduled = useLiveQuery(async () => {
@@ -67,6 +78,25 @@ export default function DagensFokus() {
     [rawList]
   )
   const collapseDone = doneItems.length > COLLAPSE_THRESHOLD
+
+  // Nest a child under its parent only when both are open and visible in
+  // today's list — a child whose parent is done or not scheduled here stays
+  // a normal top-level row instead of nesting under something you can't see.
+  const activeIdSet = useMemo(() => new Set(activeItems.map((i) => i.id)), [activeItems])
+  const parentIdByChildId = useMemo(() => {
+    const map = new Map()
+    for (const [parentId, children] of childrenByParent.entries()) {
+      for (const child of children) map.set(child.id, parentId)
+    }
+    return map
+  }, [childrenByParent])
+  const activeTopLevel = useMemo(
+    () => activeItems.filter((item) => {
+      const parentId = parentIdByChildId.get(item.id)
+      return !parentId || !activeIdSet.has(parentId)
+    }),
+    [activeItems, parentIdByChildId, activeIdSet]
+  )
 
   // "Har jag flera Ute, vill jag se alla uppgifter jag bör göra innan jag
   // går in" — group active items by tag instead of a flat priority list.
@@ -230,9 +260,29 @@ export default function DagensFokus() {
           ))
         ) : (
           <div style={itemGridStyle}>
-            {activeItems.map((item) => (
-              <FocusRow key={item.id} item={item} showScheduled={showScheduled} onOpenDetail={setDetailItemId} />
-            ))}
+            {activeTopLevel.map((item) => {
+              const children = (childrenByParent.get(item.id) ?? []).filter((c) => activeIdSet.has(c.id))
+              const collapsed = collapsedParents.has(item.id)
+              return (
+                <div key={item.id}>
+                  <FocusRow
+                    item={item}
+                    showScheduled={showScheduled}
+                    onOpenDetail={setDetailItemId}
+                    childCount={children.length}
+                    collapsed={collapsed}
+                    onToggleCollapse={() => toggleParent(item.id)}
+                  />
+                  {children.length > 0 && !collapsed && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.4rem', marginLeft: '1.6rem' }}>
+                      {children.map((child) => (
+                        <FocusRow key={child.id} item={child} showScheduled={showScheduled} onOpenDetail={setDetailItemId} isChild />
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         )}
       </div>
@@ -242,16 +292,16 @@ export default function DagensFokus() {
   )
 }
 
-function FocusRow({ item, showScheduled, onOpenDetail }) {
+function FocusRow({ item, showScheduled, onOpenDetail, childCount = 0, collapsed = false, onToggleCollapse, isChild = false }) {
   const done = item.status === 'klar'
   return (
     <div
       style={{
-        background: done ? theme.colors.surfaceGreen : theme.colors.surface,
-        border: `1px solid ${done ? theme.colors.success : theme.colors.border}`,
+        background: isChild ? theme.colors.childTint : (done ? theme.colors.surfaceGreen : theme.colors.surface),
+        border: `1px solid ${isChild ? theme.colors.childTintBorder : (done ? theme.colors.success : theme.colors.border)}`,
         borderRadius: theme.radius.sm,
-        padding: '0.6rem 0.8rem',
-        boxShadow: theme.shadow.sm,
+        padding: isChild ? '0.45rem 0.7rem' : '0.6rem 0.8rem',
+        boxShadow: isChild ? 'none' : theme.shadow.sm,
         display: 'flex',
         alignItems: 'center',
         gap: '0.6rem',
@@ -264,8 +314,8 @@ function FocusRow({ item, showScheduled, onOpenDetail }) {
           border: `1.5px solid ${theme.colors.success}`,
           background: done ? theme.colors.success : theme.colors.bg,
           borderRadius: '50%',
-          width: '1.3rem',
-          height: '1.3rem',
+          width: isChild ? '1.1rem' : '1.3rem',
+          height: isChild ? '1.1rem' : '1.3rem',
           flexShrink: 0,
           cursor: 'pointer',
           padding: 0,
@@ -284,12 +334,38 @@ function FocusRow({ item, showScheduled, onOpenDetail }) {
           style={{
             color: done ? theme.colors.textMuted : theme.colors.text,
             fontWeight: 500,
+            fontSize: isChild ? '0.87rem' : '1rem',
             textDecoration: done ? 'line-through' : 'none',
           }}
         >
           {item.title}
         </div>
       </div>
+      {childCount > 0 && (
+        <button
+          onClick={onToggleCollapse}
+          title={collapsed ? 'Visa deluppgifter' : 'Dölj deluppgifter'}
+          aria-expanded={!collapsed}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.3rem',
+            border: `1px solid ${theme.colors.border}`,
+            background: theme.colors.bg,
+            borderRadius: '999px',
+            padding: '0.15rem 0.55rem',
+            cursor: 'pointer',
+            color: theme.colors.textMuted,
+            fontSize: '0.75rem',
+            flexShrink: 0,
+          }}
+        >
+          <span>{childCount}</span>
+          <span style={{ transform: collapsed ? 'none' : 'rotate(90deg)', display: 'inline-block', transition: 'transform 0.15s ease' }}>
+            ▸
+          </span>
+        </button>
+      )}
       {showScheduled && (
         <button
           onClick={() => sendToBacklog(item.id)}

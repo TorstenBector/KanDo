@@ -13,6 +13,15 @@ const TYPE_LABEL = { idea: 'Idé', project: 'Projekt', task: 'Task' }
 
 export default function PrioListView({ tagFilter }) {
   const [detailItemId, setDetailItemId] = useState(null)
+  // Parents with children start expanded (matches the previous
+  // always-shown behavior) — collapsing is an opt-in per parent.
+  const [collapsedParents, setCollapsedParents] = useState(() => new Set())
+  const toggleParent = (id) =>
+    setCollapsedParents((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
   const { childrenByParent, childIdSet } = useChildrenByParent()
   const taggedItemIds = useLiveQuery(async () => {
     if (!tagFilter) return null
@@ -59,16 +68,31 @@ export default function PrioListView({ tagFilter }) {
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
         <SortableContext items={items.map((i) => i.id)} strategy={rectSortingStrategy}>
           <div style={itemGridStyle}>
-            {items.map((item, index) => (
-              <div key={item.id}>
-                <PrioRow item={item} rank={index + 1} onOpenDetail={setDetailItemId} />
-                {(childrenByParent.get(item.id) ?? []).map((child) => (
-                  <div key={child.id} style={{ marginLeft: '1.5rem', marginTop: '0.5rem' }}>
-                    <ChildRow item={child} onOpenDetail={setDetailItemId} />
-                  </div>
-                ))}
-              </div>
-            ))}
+            {items.map((item, index) => {
+              const children = childrenByParent.get(item.id) ?? []
+              const collapsed = collapsedParents.has(item.id)
+              return (
+                <div key={item.id}>
+                  <PrioRow
+                    item={item}
+                    rank={index + 1}
+                    onOpenDetail={setDetailItemId}
+                    childCount={children.length}
+                    collapsed={collapsed}
+                    onToggleCollapse={() => toggleParent(item.id)}
+                  />
+                  {children.length > 0 && !collapsed && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.4rem' }}>
+                      {children.map((child) => (
+                        <div key={child.id} style={{ marginLeft: '1.6rem' }}>
+                          <ChildRow item={child} onOpenDetail={setDetailItemId} />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
           </div>
         </SortableContext>
       </DndContext>
@@ -78,7 +102,7 @@ export default function PrioListView({ tagFilter }) {
   )
 }
 
-function PrioRow({ item, rank, onOpenDetail }) {
+function PrioRow({ item, rank, onOpenDetail, childCount = 0, collapsed = false, onToggleCollapse }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id })
 
   const style = {
@@ -126,6 +150,33 @@ function PrioRow({ item, rank, onOpenDetail }) {
         </div>
         <div style={{ color: theme.colors.text, fontWeight: 500 }}>{item.title}</div>
       </div>
+
+      {childCount > 0 && (
+        <button
+          onClick={onToggleCollapse}
+          onPointerDown={(e) => e.stopPropagation()}
+          title={collapsed ? 'Visa deluppgifter' : 'Dölj deluppgifter'}
+          aria-expanded={!collapsed}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.3rem',
+            border: `1px solid ${theme.colors.border}`,
+            background: theme.colors.bg,
+            borderRadius: '999px',
+            padding: '0.15rem 0.55rem',
+            cursor: 'pointer',
+            color: theme.colors.textMuted,
+            fontSize: '0.75rem',
+            flexShrink: 0,
+          }}
+        >
+          <span>{childCount}</span>
+          <span style={{ transform: collapsed ? 'none' : 'rotate(90deg)', display: 'inline-block', transition: 'transform 0.15s ease' }}>
+            ▸
+          </span>
+        </button>
+      )}
 
       <div
         {...attributes}
@@ -184,11 +235,10 @@ function ChildRow({ item, onOpenDetail }) {
   return (
     <div
       style={{
-        background: theme.colors.surface,
-        border: `1px solid ${theme.colors.border}`,
+        background: theme.colors.childTint,
+        border: `1px solid ${theme.colors.childTintBorder}`,
         borderRadius: theme.radius.sm,
-        padding: '0.5rem 0.7rem',
-        boxShadow: theme.shadow.sm,
+        padding: '0.45rem 0.7rem',
         display: 'flex',
         alignItems: 'center',
         gap: '0.5rem',
@@ -201,8 +251,8 @@ function ChildRow({ item, onOpenDetail }) {
           border: `1.5px solid ${theme.colors.success}`,
           background: done ? theme.colors.success : theme.colors.bg,
           borderRadius: '50%',
-          width: '1.1rem',
-          height: '1.1rem',
+          width: '1rem',
+          height: '1rem',
           flexShrink: 0,
           cursor: 'pointer',
           padding: 0,
@@ -215,7 +265,7 @@ function ChildRow({ item, onOpenDetail }) {
       <span
         onClick={() => onOpenDetail(item.id)}
         style={{
-          flex: 1, cursor: 'pointer', fontSize: '0.9rem',
+          flex: 1, cursor: 'pointer', fontSize: '0.87rem',
           color: done ? theme.colors.textMuted : theme.colors.text,
           textDecoration: done ? 'line-through' : 'none',
         }}

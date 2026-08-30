@@ -15,6 +15,11 @@ export const theme = {
     success:       '#34C759',
     danger:        '#CC3333',
     warning:       '#E8A020',
+    // Subtask/child cards — deliberately its own hue (warm wheat, not
+    // green or gold) so a nested child never reads as "done" or
+    // "high priority" by accident. See spec discussion on child card styling.
+    childTint:       '#EFE3C8',
+    childTintBorder: '#DCC998',
   },
   shadow: {
     sm: '0 1px 3px rgba(26,58,26,0.15)',

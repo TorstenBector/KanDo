@@ -36,6 +36,15 @@ export default function BacklogView({ tagFilter }) {
   const [typeFilter, setTypeFilter] = useState('all')
   const [detailItemId, setDetailItemId] = useState(null)
   const [showPaused, setShowPaused] = useState(false)
+  // Parents with children start expanded (matches the previous
+  // always-shown behavior) — collapsing is an opt-in per parent.
+  const [collapsedParents, setCollapsedParents] = useState(() => new Set())
+  const toggleParent = (id) =>
+    setCollapsedParents((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
   const { childrenByParent, childIdSet } = useChildrenByParent()
   const taggedItemIds = useLiveQuery(async () => {
     if (!tagFilter) return null
@@ -89,16 +98,30 @@ export default function BacklogView({ tagFilter }) {
       </div>
 
       <div style={itemGridStyle}>
-        {topLevel.map((item) => (
-          <div key={item.id}>
-            <BacklogItemRow item={item} onOpenDetail={setDetailItemId} />
-            {(childrenByParent.get(item.id) ?? []).map((child) => (
-              <div key={child.id} style={{ marginLeft: '1.5rem', marginTop: '0.5rem' }}>
-                <BacklogItemRow item={child} onOpenDetail={setDetailItemId} />
-              </div>
-            ))}
-          </div>
-        ))}
+        {topLevel.map((item) => {
+          const children = childrenByParent.get(item.id) ?? []
+          const collapsed = collapsedParents.has(item.id)
+          return (
+            <div key={item.id}>
+              <BacklogItemRow
+                item={item}
+                onOpenDetail={setDetailItemId}
+                childCount={children.length}
+                collapsed={collapsed}
+                onToggleCollapse={() => toggleParent(item.id)}
+              />
+              {children.length > 0 && !collapsed && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', marginTop: '0.4rem' }}>
+                  {children.map((child) => (
+                    <div key={child.id} style={{ marginLeft: '1.6rem' }}>
+                      <BacklogItemRow item={child} onOpenDetail={setDetailItemId} isChild />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })}
         {topLevel.length === 0 && (
           <p style={{ color: theme.colors.textMuted }}>Tomt här. Använd Snabbfånga för att lägga till något.</p>
         )}
@@ -160,7 +183,7 @@ export default function BacklogView({ tagFilter }) {
   )
 }
 
-function BacklogItemRow({ item, onOpenDetail }) {
+function BacklogItemRow({ item, onOpenDetail, childCount = 0, collapsed = false, onToggleCollapse, isChild = false }) {
   const [tagInput, setTagInput] = useState('')
   const [customRecurrence, setCustomRecurrence] = useState(false)
   const tags = useItemTags(item.id) ?? []
@@ -192,11 +215,11 @@ function BacklogItemRow({ item, onOpenDetail }) {
   return (
     <div
       style={{
-        background: theme.colors.surface,
-        border: `1px solid ${theme.colors.border}`,
+        background: isChild ? theme.colors.childTint : theme.colors.surface,
+        border: `1px solid ${isChild ? theme.colors.childTintBorder : theme.colors.border}`,
         borderRadius: theme.radius.sm,
-        padding: '0.6rem 0.8rem',
-        boxShadow: theme.shadow.sm,
+        padding: isChild ? '0.45rem 0.7rem' : '0.6rem 0.8rem',
+        boxShadow: isChild ? 'none' : theme.shadow.sm,
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
@@ -207,8 +230,8 @@ function BacklogItemRow({ item, onOpenDetail }) {
             border: `1.5px solid ${theme.colors.border}`,
             background: theme.colors.bg,
             borderRadius: '50%',
-            width: '1.3rem',
-            height: '1.3rem',
+            width: isChild ? '1.1rem' : '1.3rem',
+            height: isChild ? '1.1rem' : '1.3rem',
             flexShrink: 0,
             marginTop: '0.15rem',
             cursor: 'pointer',
@@ -249,12 +272,37 @@ function BacklogItemRow({ item, onOpenDetail }) {
               background: 'transparent',
               color: theme.colors.text,
               fontWeight: 500,
-              fontSize: '1rem',
+              fontSize: isChild ? '0.87rem' : '1rem',
               width: '100%',
               padding: '0.15rem 0',
             }}
           />
         </div>
+        {childCount > 0 && (
+          <button
+            onClick={onToggleCollapse}
+            title={collapsed ? 'Visa deluppgifter' : 'Dölj deluppgifter'}
+            aria-expanded={!collapsed}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.3rem',
+              border: `1px solid ${theme.colors.border}`,
+              background: theme.colors.bg,
+              borderRadius: '999px',
+              padding: '0.15rem 0.55rem',
+              cursor: 'pointer',
+              color: theme.colors.textMuted,
+              fontSize: '0.75rem',
+              flexShrink: 0,
+            }}
+          >
+            <span>{childCount}</span>
+            <span style={{ transform: collapsed ? 'none' : 'rotate(90deg)', display: 'inline-block', transition: 'transform 0.15s ease' }}>
+              ▸
+            </span>
+          </button>
+        )}
         <select
           value={item.backlog_priority ?? ''}
           onChange={(e) => updateItem(item.id, { backlog_priority: e.target.value || null })}

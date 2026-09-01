@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { createItem } from '../hooks/useItems'
+import { db } from '../lib/db'
+import { createItem, scheduleToday, togglePrioritized } from '../hooks/useItems'
+import { findOrCreateTag } from '../hooks/useTags'
 import { theme } from '../theme'
 
 function deriveTitle(text) {
@@ -11,15 +13,37 @@ export default function QuickCapture() {
   const [open, setOpen] = useState(false)
   const [text, setText] = useState('')
   const [saving, setSaving] = useState(false)
+  const [prioritized, setPrioritized] = useState(false)
+  const [scheduledToday, setScheduledToday] = useState(false)
+  const [tagInput, setTagInput] = useState('')
+  const [tagKind, setTagKind] = useState('category')
+
+  function reset() {
+    setText('')
+    setPrioritized(false)
+    setScheduledToday(false)
+    setTagInput('')
+    setTagKind('category')
+    setOpen(false)
+  }
 
   async function handleSave() {
     const trimmed = text.trim()
     if (!trimmed) return
     setSaving(true)
-    await createItem({ type: 'idea', title: deriveTitle(trimmed), original_text: trimmed })
+    const item = await createItem({ type: 'idea', title: deriveTitle(trimmed), original_text: trimmed })
+    // New item always starts in Backlog — togglePrioritized flips it to
+    // Prioriterad (with a correct priority_rank), same as the "+ Prioriterad"
+    // pill elsewhere.
+    if (prioritized) await togglePrioritized(item.id)
+    if (scheduledToday) await scheduleToday(item.id)
+    const tagName = tagInput.trim()
+    if (tagName) {
+      const tag = await findOrCreateTag(tagName, tagKind)
+      await db.item_tags.put({ item_id: item.id, tag_id: tag.id })
+    }
     setSaving(false)
-    setText('')
-    setOpen(false)
+    reset()
   }
 
   return (
@@ -55,7 +79,7 @@ export default function QuickCapture() {
 
       {open && (
         <div
-          onClick={() => setOpen(false)}
+          onClick={reset}
           style={{
             position: 'fixed',
             inset: 0,
@@ -100,8 +124,44 @@ export default function QuickCapture() {
                 boxSizing: 'border-box',
               }}
             />
+
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.6rem' }}>
+              <button onClick={() => setPrioritized((v) => !v)} style={prioritized ? pillActive : pill}>
+                {prioritized ? '✓ Prioriterad' : '+ Prioriterad'}
+              </button>
+              <button onClick={() => setScheduledToday((v) => !v)} style={scheduledToday ? pillActive : pill}>
+                {scheduledToday ? '✓ Dagens Fokus' : '+ Dagens Fokus'}
+              </button>
+            </div>
+
+            <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.5rem', alignItems: 'center' }}>
+              <input
+                value={tagInput}
+                onChange={(e) => setTagInput(e.target.value)}
+                placeholder="+ tagg (valfritt)"
+                style={{
+                  flex: 1,
+                  fontSize: '0.85rem',
+                  border: `1px dashed ${theme.colors.border}`,
+                  borderRadius: '999px',
+                  padding: '0.3rem 0.7rem',
+                  background: 'transparent',
+                  color: theme.colors.text,
+                }}
+              />
+              {tagInput.trim() && (
+                <button
+                  onClick={() => setTagKind((k) => (k === 'category' ? 'context' : 'category'))}
+                  title="Byt taggtyp"
+                  style={{ ...pill, flexShrink: 0 }}
+                >
+                  {tagKind === 'context' ? '📍 Sammanhang' : '🏷 Kategori'}
+                </button>
+              )}
+            </div>
+
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.75rem' }}>
-              <button onClick={() => setOpen(false)} style={secondaryBtn}>Avbryt</button>
+              <button onClick={reset} style={secondaryBtn}>Avbryt</button>
               <button onClick={handleSave} disabled={saving || !text.trim()} style={primaryBtn}>
                 {saving ? 'Sparar…' : 'Spara'}
               </button>
@@ -130,4 +190,21 @@ const secondaryBtn = {
   borderRadius: theme.radius.sm,
   padding: '0.5rem 1rem',
   cursor: 'pointer',
+}
+
+const pill = {
+  fontSize: '0.8rem',
+  border: `1px solid ${theme.colors.border}`,
+  borderRadius: '999px',
+  padding: '0.3rem 0.7rem',
+  background: 'transparent',
+  color: theme.colors.textMuted,
+  cursor: 'pointer',
+}
+
+const pillActive = {
+  ...pill,
+  border: `1px solid ${theme.colors.primary}`,
+  background: theme.colors.primary,
+  color: theme.colors.textOnPrimary,
 }

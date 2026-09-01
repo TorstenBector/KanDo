@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
 import { updateItem, deleteItem, markDoneWithConfirm, scheduleToday, unschedule, setRecurrence, togglePrioritized, resumeItem } from '../hooks/useItems'
@@ -183,6 +183,48 @@ export default function BacklogView({ tagFilter }) {
   )
 }
 
+// A plain <input> can't wrap — a long title just scrolls sideways inside a
+// fixed-height box, clipped and unworkable to edit. This auto-grows to fit
+// its content (like the other views' read-only title <div>s do naturally)
+// while staying an editable field, so inline renaming in Backlog still works.
+function TitleField({ value, onChange, fontSize }) {
+  const ref = useRef(null)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }, [value])
+
+  return (
+    <textarea
+      ref={ref}
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      onKeyDown={(e) => {
+        // Titles are single-line in spirit — Enter shouldn't insert a
+        // newline, just get out of the way (blur commits the edit).
+        if (e.key === 'Enter') { e.preventDefault(); e.target.blur() }
+      }}
+      rows={1}
+      style={{
+        border: 'none',
+        background: 'transparent',
+        color: theme.colors.text,
+        fontWeight: 500,
+        fontSize,
+        fontFamily: 'inherit',
+        lineHeight: 1.3,
+        width: '100%',
+        padding: '0.15rem 0',
+        resize: 'none',
+        overflow: 'hidden',
+      }}
+    />
+  )
+}
+
 function BacklogItemRow({ item, onOpenDetail, childCount = 0, collapsed = false, onToggleCollapse, isChild = false }) {
   const [tagInput, setTagInput] = useState('')
   const [customRecurrence, setCustomRecurrence] = useState(false)
@@ -264,18 +306,10 @@ function BacklogItemRow({ item, onOpenDetail, childCount = 0, collapsed = false,
             </select>
             <span style={{ fontSize: '0.7rem', color: theme.colors.textMuted }}>· {item.status}</span>
           </div>
-          <input
+          <TitleField
             value={item.title}
-            onChange={(e) => updateItem(item.id, { title: e.target.value })}
-            style={{
-              border: 'none',
-              background: 'transparent',
-              color: theme.colors.text,
-              fontWeight: 500,
-              fontSize: isChild ? '0.87rem' : '1rem',
-              width: '100%',
-              padding: '0.15rem 0',
-            }}
+            onChange={(title) => updateItem(item.id, { title })}
+            fontSize={isChild ? '0.87rem' : '1rem'}
           />
         </div>
         {childCount > 0 && (

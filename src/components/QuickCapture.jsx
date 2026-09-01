@@ -24,28 +24,34 @@ export default function QuickCapture() {
 
   return (
     <>
-      <button
-        onClick={() => setOpen(true)}
-        aria-label="Snabbfånga"
-        style={{
-          position: 'fixed',
-          bottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))',
-          right: 'calc(1.5rem + env(safe-area-inset-right, 0px))',
-          width: '3.5rem',
-          height: '3.5rem',
-          borderRadius: '50%',
-          background: theme.colors.primary,
-          color: theme.colors.textOnPrimary,
-          border: 'none',
-          boxShadow: theme.shadow.md,
-          fontSize: '1.75rem',
-          lineHeight: 1,
-          cursor: 'pointer',
-          zIndex: 250,
-        }}
-      >
-        +
-      </button>
+      {/* Hidden while the panel is open — it sits at a higher z-index than
+          the panel overlay (so it stays reachable from every other screen),
+          which otherwise floats it right on top of the panel's own Spara
+          button in the same bottom-right corner. */}
+      {!open && (
+        <button
+          onClick={() => setOpen(true)}
+          aria-label="Snabbfånga"
+          style={{
+            position: 'fixed',
+            bottom: 'calc(1.5rem + env(safe-area-inset-bottom, 0px))',
+            right: 'calc(1.5rem + env(safe-area-inset-right, 0px))',
+            width: '3.5rem',
+            height: '3.5rem',
+            borderRadius: '50%',
+            background: theme.colors.primary,
+            color: theme.colors.textOnPrimary,
+            border: 'none',
+            boxShadow: theme.shadow.md,
+            fontSize: '1.75rem',
+            lineHeight: 1,
+            cursor: 'pointer',
+            zIndex: 250,
+          }}
+        >
+          +
+        </button>
+      )}
 
       {open && (
         <div

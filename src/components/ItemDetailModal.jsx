@@ -167,6 +167,11 @@ export default function ItemDetailModal({ itemId, onClose }) {
             ↳ Deluppgift till <strong>{parent.title}</strong>
           </div>
         )}
+        {item.claimed_by && (
+          <div style={{ fontSize: '0.8rem', color: theme.colors.text, marginBottom: '0.5rem' }}>
+            🙋 Tagen av <strong>{item.claimed_by}</strong> (via delad länk)
+          </div>
+        )}
 
         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
           <select

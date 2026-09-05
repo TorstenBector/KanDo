@@ -303,6 +303,11 @@ function BacklogItemRow({ item, onOpenDetail, childCount = 0, collapsed = false,
             onChange={(title) => updateItem(item.id, { title })}
             fontSize={isChild ? '0.87rem' : '1rem'}
           />
+          {item.claimed_by && (
+            <div style={{ fontSize: '0.7rem', color: theme.colors.textMuted, marginTop: '0.1rem' }}>
+              🙋 Tagen av {item.claimed_by}
+            </div>
+          )}
         </div>
         {childCount > 0 && (
           <button

@@ -80,6 +80,11 @@ export default function ItemCard({ item, onOpenDetail }) {
               ● {PRIORITY_LABEL[item.backlog_priority]}
             </div>
           )}
+          {item.claimed_by && (
+            <div style={{ fontSize: '0.65rem', color: theme.colors.textMuted, marginTop: '0.15rem' }}>
+              🙋 {item.claimed_by}
+            </div>
+          )}
         </div>
         {children.length > 0 && (
           <button

@@ -507,6 +507,11 @@ function FocusRow({ item, showScheduled, onOpenDetail, childCount = 0, collapsed
         >
           {item.title}
         </div>
+        {item.claimed_by && (
+          <div style={{ fontSize: '0.7rem', color: theme.colors.textMuted, marginTop: '0.1rem' }}>
+            🙋 Tagen av {item.claimed_by}
+          </div>
+        )}
       </div>
       {childCount > 0 && (
         <button

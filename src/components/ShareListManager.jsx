@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { db } from '../lib/db'
 import { useTags } from '../hooks/useTags'
 import { useSyncStore } from '../store/syncStore'
 import { supabase } from '../lib/supabaseClient'
@@ -17,6 +19,24 @@ export default function ShareListManager() {
   const [loading, setLoading] = useState(true)
   const [busyTagId, setBusyTagId] = useState(null)
   const [copiedToken, setCopiedToken] = useState(null)
+
+  // How many items with this tag are already claimed — read straight from
+  // Dexie (local-first) rather than a network round-trip, since claiming
+  // syncs back into the same items table this app already watches.
+  const claimSummaryByTag = useLiveQuery(async () => {
+    const links = await db.item_tags.toArray()
+    const byTag = new Map()
+    for (const link of links) {
+      if (!byTag.has(link.tag_id)) byTag.set(link.tag_id, [])
+      byTag.get(link.tag_id).push(link.item_id)
+    }
+    const result = new Map()
+    for (const [tagId, itemIds] of byTag) {
+      const items = (await db.items.bulkGet(itemIds)).filter(Boolean)
+      result.set(tagId, { total: items.length, claimed: items.filter((i) => i.claimed_by).length })
+    }
+    return result
+  }, []) ?? new Map()
 
   async function loadShares() {
     if (!session) { setLoading(false); return }
@@ -82,8 +102,8 @@ export default function ShareListManager() {
   return (
     <div style={{ padding: '1rem' }}>
       <p style={{ color: theme.colors.textMuted, fontSize: '0.9rem', margin: '0 0 1rem' }}>
-        Dela allt som har en viss tagg som en offentlig länk — mottagaren behöver inget konto, kan öppna listan,
-        åta sig den och bocka av det som är klart. Det syns direkt i din egen app.
+        Dela allt som har en viss tagg som en offentlig länk. Flera personer kan öppna samma länk och var och en
+        plockar sin egen KanDo — vem som tagit vad syns direkt i din egen app.
       </p>
 
       {allTags.length === 0 && (
@@ -94,6 +114,7 @@ export default function ShareListManager() {
         {allTags.map((tag) => {
           const share = shares.find((s) => s.tag_id === tag.id)
           const busy = busyTagId === tag.id || busyTagId === share?.id
+          const summary = claimSummaryByTag.get(tag.id)
           return (
             <div
               key={tag.id}
@@ -156,9 +177,9 @@ export default function ShareListManager() {
                     </button>
                   </div>
                   <div style={{ fontSize: '0.8rem', color: theme.colors.textMuted }}>
-                    {share.accepted_by
-                      ? `✓ Åtagen av ${share.accepted_by} (${new Date(share.accepted_at).toLocaleDateString('sv-SE')})`
-                      : 'Väntar på att någon öppnar och åtar sig listan.'}
+                    {summary && summary.total > 0
+                      ? `🙋 ${summary.claimed} av ${summary.total} KanDo${summary.total === 1 ? '' : 's'} tagna`
+                      : 'Inga KanDo’s med den här taggen ännu.'}
                   </div>
                 </div>
               )}

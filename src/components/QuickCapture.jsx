@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { db } from '../lib/db'
 import { createItem, scheduleToday, togglePrioritized, toggleShoppingList } from '../hooks/useItems'
-import { findOrCreateTag } from '../hooks/useTags'
+import TagInput from './TagInput'
 import { theme } from '../theme'
 
 function deriveTitle(text) {
@@ -16,16 +16,14 @@ export default function QuickCapture() {
   const [prioritized, setPrioritized] = useState(false)
   const [scheduledToday, setScheduledToday] = useState(false)
   const [shoppingList, setShoppingList] = useState(false)
-  const [tagInput, setTagInput] = useState('')
-  const [tagKind, setTagKind] = useState('category')
+  const [pendingTags, setPendingTags] = useState([])
 
   function reset() {
     setText('')
     setPrioritized(false)
     setScheduledToday(false)
     setShoppingList(false)
-    setTagInput('')
-    setTagKind('category')
+    setPendingTags([])
     setOpen(false)
   }
 
@@ -40,9 +38,7 @@ export default function QuickCapture() {
     if (prioritized) await togglePrioritized(item.id)
     if (scheduledToday) await scheduleToday(item.id)
     if (shoppingList) await toggleShoppingList(item.id)
-    const tagName = tagInput.trim()
-    if (tagName) {
-      const tag = await findOrCreateTag(tagName, tagKind)
+    for (const tag of pendingTags) {
       await db.item_tags.put({ item_id: item.id, tag_id: tag.id })
     }
     setSaving(false)
@@ -140,30 +136,28 @@ export default function QuickCapture() {
               </button>
             </div>
 
-            <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.5rem', alignItems: 'center' }}>
-              <input
-                value={tagInput}
-                onChange={(e) => setTagInput(e.target.value)}
-                placeholder="+ tagg (valfritt)"
-                style={{
-                  flex: 1,
-                  fontSize: '0.85rem',
-                  border: `1px dashed ${theme.colors.border}`,
-                  borderRadius: '999px',
-                  padding: '0.3rem 0.7rem',
-                  background: 'transparent',
-                  color: theme.colors.text,
-                }}
-              />
-              {tagInput.trim() && (
-                <button
-                  onClick={() => setTagKind((k) => (k === 'category' ? 'context' : 'category'))}
-                  title="Byt taggtyp"
-                  style={{ ...pill, flexShrink: 0 }}
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.5rem', alignItems: 'center' }}>
+              {pendingTags.map((tag) => (
+                <span
+                  key={tag.id}
+                  onClick={() => setPendingTags((tags) => tags.filter((t) => t.id !== tag.id))}
+                  title="Klicka för att ta bort"
+                  style={{
+                    fontSize: '0.75rem',
+                    padding: '0.15rem 0.5rem',
+                    borderRadius: '999px',
+                    background: tag.kind === 'context' ? theme.colors.accentSoft : theme.colors.surfaceGreen,
+                    color: theme.colors.text,
+                    cursor: 'pointer',
+                  }}
                 >
-                  {tagKind === 'context' ? '📍 Sammanhang' : '🏷 Kategori'}
-                </button>
-              )}
+                  {tag.kind === 'context' ? '📍 ' : ''}{tag.name}
+                </span>
+              ))}
+              <TagInput
+                onAdd={(tag) => setPendingTags((tags) => (tags.some((t) => t.id === tag.id) ? tags : [...tags, tag]))}
+                excludeIds={new Set(pendingTags.map((t) => t.id))}
+              />
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.75rem' }}>

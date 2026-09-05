@@ -9,9 +9,10 @@ import {
   addChildItem, removeChildRelation, reorderChildren, markDoneWithConfirm,
   pauseItem, resumeItem, toggleShoppingList,
 } from '../hooks/useItems'
-import { findOrCreateTag, useItemTags } from '../hooks/useTags'
+import { useItemTags } from '../hooks/useTags'
 import { useChildren, useParent } from '../hooks/useRelations'
 import { useItemImages, addImage, removeImage } from '../hooks/useImages'
+import TagInput from './TagInput'
 import { theme } from '../theme'
 
 const TYPE_LABEL = { idea: 'Idé', project: 'Projekt', task: 'Task' }
@@ -56,7 +57,6 @@ export default function ItemDetailModal({ itemId, onClose }) {
   const children = useChildren(itemId)
   const parent = useParent(itemId)
   const images = useItemImages(itemId)
-  const [tagInput, setTagInput] = useState('')
   const [childInput, setChildInput] = useState('')
   const [customRecurrence, setCustomRecurrence] = useState(false)
   const [showWeekdays, setShowWeekdays] = useState(false)
@@ -111,14 +111,6 @@ export default function ItemDetailModal({ itemId, onClose }) {
     const current = item.recurrence_weekdays ?? []
     const next = current.includes(day) ? current.filter((d) => d !== day) : [...current, day].sort()
     setRecurrenceWeekdays(item.id, next)
-  }
-
-  async function addTag(kind) {
-    const name = tagInput.trim()
-    if (!name) return
-    const tag = await findOrCreateTag(name, kind)
-    await db.item_tags.put({ item_id: item.id, tag_id: tag.id })
-    setTagInput('')
   }
 
   async function removeTag(tagId) {
@@ -360,19 +352,10 @@ export default function ItemDetailModal({ itemId, onClose }) {
               {tag.kind === 'context' ? '📍 ' : ''}{tag.name}
             </span>
           ))}
-          <input
-            value={tagInput}
-            onChange={(e) => setTagInput(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && addTag('category')}
-            placeholder="+ tagg"
-            style={{ ...inputStyle, width: '90px', fontSize: '0.75rem', padding: '0.2rem 0.5rem' }}
+          <TagInput
+            onAdd={(tag) => db.item_tags.put({ item_id: item.id, tag_id: tag.id })}
+            excludeIds={new Set((tags ?? []).map((t) => t.id))}
           />
-          {tagInput && (
-            <>
-              <button onClick={() => addTag('category')} style={miniLinkBtn}>som kategori</button>
-              <button onClick={() => addTag('context')} style={miniLinkBtn}>som sammanhang</button>
-            </>
-          )}
         </div>
 
         <label style={labelStyle}>Deluppgifter</label>
@@ -531,11 +514,3 @@ const weekdayPillActive = {
   fontWeight: 600,
 }
 
-const miniLinkBtn = {
-  fontSize: '0.7rem',
-  border: 'none',
-  background: 'transparent',
-  color: theme.colors.primary,
-  cursor: 'pointer',
-  textDecoration: 'underline',
-}

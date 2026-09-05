@@ -2,9 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
 import { updateItem, deleteItem, markDoneWithConfirm, scheduleToday, unschedule, setRecurrence, togglePrioritized, resumeItem, toggleShoppingList } from '../hooks/useItems'
-import { findOrCreateTag, useItemTags } from '../hooks/useTags'
+import { useItemTags } from '../hooks/useTags'
 import { useChildrenByParent } from '../hooks/useRelations'
 import ItemDetailModal from './ItemDetailModal'
+import TagInput from './TagInput'
 import { theme } from '../theme'
 
 const TYPE_TABS = [
@@ -226,7 +227,6 @@ function TitleField({ value, onChange, fontSize }) {
 }
 
 function BacklogItemRow({ item, onOpenDetail, childCount = 0, collapsed = false, onToggleCollapse, isChild = false }) {
-  const [tagInput, setTagInput] = useState('')
   const [customRecurrence, setCustomRecurrence] = useState(false)
   const tags = useItemTags(item.id) ?? []
   const isScheduledToday = item.scheduled_date === todayISO()
@@ -240,14 +240,6 @@ function BacklogItemRow({ item, onOpenDetail, childCount = 0, collapsed = false,
     }
     setCustomRecurrence(false)
     setRecurrence(item.id, value ? Number(value) : null)
-  }
-
-  async function addTag(kind) {
-    const name = tagInput.trim()
-    if (!name) return
-    const tag = await findOrCreateTag(name, kind)
-    await db.item_tags.put({ item_id: item.id, tag_id: tag.id })
-    setTagInput('')
   }
 
   async function removeTag(tagId) {
@@ -398,27 +390,10 @@ function BacklogItemRow({ item, onOpenDetail, childCount = 0, collapsed = false,
             {tag.kind === 'context' ? '📍 ' : ''}{tag.name}
           </span>
         ))}
-        <input
-          value={tagInput}
-          onChange={(e) => setTagInput(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && addTag('category')}
-          placeholder="+ tagg"
-          style={{
-            fontSize: '0.75rem',
-            border: `1px dashed ${theme.colors.border}`,
-            borderRadius: '999px',
-            padding: '0.15rem 0.5rem',
-            width: '90px',
-            background: 'transparent',
-            color: theme.colors.text,
-          }}
+        <TagInput
+          onAdd={(tag) => db.item_tags.put({ item_id: item.id, tag_id: tag.id })}
+          excludeIds={new Set(tags.map((t) => t.id))}
         />
-        {tagInput && (
-          <>
-            <button onClick={() => addTag('category')} style={miniBtn}>som kategori</button>
-            <button onClick={() => addTag('context')} style={miniBtn}>som sammanhang</button>
-          </>
-        )}
       </div>
 
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.5rem', alignItems: 'center' }}>

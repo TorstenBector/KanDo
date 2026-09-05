@@ -305,7 +305,11 @@ export default function DagensFokus({ selectedTagIds }) {
         ) : (
           <div style={itemGridStyle}>
             {activeTopLevel.map((item) => {
-              const children = (childrenByParent.get(item.id) ?? []).filter((c) => activeIdSet.has(c.id))
+              // Every subtask, regardless of whether it's itself scheduled
+              // for this date — a parent with subtasks should always be
+              // expandable to reveal them here, not just when they happen
+              // to share today's date too.
+              const children = childrenByParent.get(item.id) ?? []
               const collapsed = !expandedParents.has(item.id)
               return (
                 <div key={item.id}>
@@ -529,13 +533,12 @@ function FocusRow({ item, showScheduled, onOpenDetail, childCount = 0, collapsed
             cursor: 'pointer',
             color: theme.colors.textMuted,
             fontSize: '0.75rem',
+            fontWeight: 700,
             flexShrink: 0,
           }}
         >
           <span>{childCount}</span>
-          <span style={{ transform: collapsed ? 'none' : 'rotate(90deg)', display: 'inline-block', transition: 'transform 0.15s ease' }}>
-            ▸
-          </span>
+          <span style={{ fontSize: '0.9rem', lineHeight: 1 }}>{collapsed ? '+' : '−'}</span>
         </button>
       )}
       {showScheduled && (

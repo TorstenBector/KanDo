@@ -19,6 +19,19 @@ function addDays(isoDate, days) {
   return d.toISOString().slice(0, 10)
 }
 
+// ISO weekday numbers: 1=Monday .. 7=Sunday. Finds the nearest upcoming date
+// (starting tomorrow) whose weekday is in the given set.
+function nextWeekdayOccurrence(weekdays) {
+  const today = new Date()
+  for (let i = 1; i <= 7; i++) {
+    const d = new Date(today)
+    d.setDate(d.getDate() + i)
+    const iso = ((d.getDay() + 6) % 7) + 1
+    if (weekdays.includes(iso)) return d.toISOString().slice(0, 10)
+  }
+  return null
+}
+
 export function useItems({ type, status } = {}) {
   return useLiveQuery(async () => {
     const all = await db.items.toArray()
@@ -46,10 +59,12 @@ export async function createItem({ type, title, original_text = null, descriptio
     scheduled_date: null,
     completed_at: null,
     recurrence_days: null,
+    recurrence_weekdays: null,
     next_due_date: null,
     last_completed_at: null,
     kanban_entered: false,
     paused_until: null,
+    in_shopping_list: false,
     created_at: now,
     updated_at: now,
     _syncStatus: 'pending',
@@ -72,7 +87,11 @@ export async function markDone(id) {
   const item = await db.items.get(id)
   const now = new Date().toISOString()
   const changes = { status: 'klar', completed_at: now, last_completed_at: now }
-  if (item?.recurrence_days) {
+  // Weekday mode and day-count mode are alternatives (see setRecurrence /
+  // setRecurrenceWeekdays) — weekday wins when both would somehow be set.
+  if (item?.recurrence_weekdays?.length) {
+    changes.next_due_date = nextWeekdayOccurrence(item.recurrence_weekdays)
+  } else if (item?.recurrence_days) {
     changes.next_due_date = addDays(todayISO(), item.recurrence_days)
   }
   await updateItem(id, changes)
@@ -129,7 +148,22 @@ export async function sendToBacklog(id) {
 }
 
 export async function setRecurrence(id, days) {
-  await updateItem(id, { recurrence_days: days })
+  // Day-count and weekday-based recurrence are alternatives, not combined —
+  // picking one clears the other so next_due_date has one unambiguous rule.
+  await updateItem(id, { recurrence_days: days, recurrence_weekdays: null })
+}
+
+export async function setRecurrenceWeekdays(id, weekdays) {
+  await updateItem(id, {
+    recurrence_weekdays: weekdays && weekdays.length ? weekdays : null,
+    recurrence_days: null,
+  })
+}
+
+export async function toggleShoppingList(id) {
+  const item = await db.items.get(id)
+  if (!item) return
+  await updateItem(id, { in_shopping_list: !item.in_shopping_list })
 }
 
 // Direct promote/demote between Backlog and Prioriterad, without needing
@@ -169,7 +203,11 @@ export async function cloneItem(id) {
     title: original.title,
     description: original.description,
   })
-  await updateItem(clone.id, { backlog_priority: original.backlog_priority, recurrence_days: original.recurrence_days })
+  await updateItem(clone.id, {
+    backlog_priority: original.backlog_priority,
+    recurrence_days: original.recurrence_days,
+    recurrence_weekdays: original.recurrence_weekdays,
+  })
 
   const links = await db.item_tags.where('item_id').equals(id).toArray()
   for (const link of links) {
@@ -187,6 +225,13 @@ export async function addChildItem(parentId, title) {
   if (!parent) return
   const child = await createItem({ type: parent.type, title })
   await updateItem(child.id, { status: parent.status })
+
+  // Inherit the parent's tags as a starting default — not a lock, the
+  // child's tags can be changed or added to afterward like any other item.
+  const parentTagLinks = await db.item_tags.where('item_id').equals(parentId).toArray()
+  for (const link of parentTagLinks) {
+    await db.item_tags.put({ item_id: child.id, tag_id: link.tag_id })
+  }
 
   const existing = await db.item_relations
     .where({ from_item_id: parentId, relation_type: 'parent_child' })
@@ -285,7 +330,7 @@ async function maybeOfferToCompleteParent(childId) {
 export async function reactivateDueRecurringItems() {
   const today = todayISO()
   const due = await db.items
-    .filter((i) => i.status === 'klar' && !!i.recurrence_days && i.next_due_date && i.next_due_date <= today)
+    .filter((i) => i.status === 'klar' && (!!i.recurrence_days || !!i.recurrence_weekdays?.length) && i.next_due_date && i.next_due_date <= today)
     .toArray()
   for (const item of due) {
     await updateItem(item.id, {

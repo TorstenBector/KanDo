@@ -11,23 +11,23 @@ import { theme } from '../theme'
 
 const TYPE_LABEL = { idea: 'Idé', project: 'Projekt', task: 'Task' }
 
-export default function PrioListView({ tagFilter }) {
+export default function PrioListView({ selectedTagIds }) {
   const [detailItemId, setDetailItemId] = useState(null)
-  // Parents with children start expanded (matches the previous
-  // always-shown behavior) — collapsing is an opt-in per parent.
-  const [collapsedParents, setCollapsedParents] = useState(() => new Set())
+  // Parents with many children take up a lot of space, so they start
+  // collapsed — expanding is an opt-in per parent.
+  const [expandedParents, setExpandedParents] = useState(() => new Set())
   const toggleParent = (id) =>
-    setCollapsedParents((prev) => {
+    setExpandedParents((prev) => {
       const next = new Set(prev)
       next.has(id) ? next.delete(id) : next.add(id)
       return next
     })
   const { childrenByParent, childIdSet } = useChildrenByParent()
   const taggedItemIds = useLiveQuery(async () => {
-    if (!tagFilter) return null
-    const links = await db.item_tags.where('tag_id').equals(tagFilter).toArray()
+    if (!selectedTagIds || selectedTagIds.size === 0) return null
+    const links = await db.item_tags.where('tag_id').anyOf([...selectedTagIds]).toArray()
     return new Set(links.map((l) => l.item_id))
-  }, [tagFilter])
+  }, [selectedTagIds])
   const allItems = useLiveQuery(async () => {
     const all = await db.items.where('status').equals('prioriterad').toArray()
     return all.sort((a, b) => (a.priority_rank ?? 999999) - (b.priority_rank ?? 999999))
@@ -37,9 +37,9 @@ export default function PrioListView({ tagFilter }) {
   // draggable rows — see spec discussion: "presenteras ihop i Backlog och Prio".
   const items = useMemo(() => {
     let result = allItems.filter((i) => !childIdSet.has(i.id))
-    if (tagFilter && taggedItemIds) result = result.filter((i) => taggedItemIds.has(i.id))
+    if (selectedTagIds?.size > 0 && taggedItemIds) result = result.filter((i) => taggedItemIds.has(i.id))
     return result
-  }, [allItems, childIdSet, tagFilter, taggedItemIds])
+  }, [allItems, childIdSet, selectedTagIds, taggedItemIds])
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
@@ -70,7 +70,7 @@ export default function PrioListView({ tagFilter }) {
           <div style={itemGridStyle}>
             {items.map((item, index) => {
               const children = childrenByParent.get(item.id) ?? []
-              const collapsed = collapsedParents.has(item.id)
+              const collapsed = !expandedParents.has(item.id)
               return (
                 <div key={item.id}>
                   <PrioRow

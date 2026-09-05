@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { db } from '../lib/db'
-import { createItem, scheduleToday, togglePrioritized } from '../hooks/useItems'
+import { createItem, scheduleToday, togglePrioritized, toggleShoppingList } from '../hooks/useItems'
 import { findOrCreateTag } from '../hooks/useTags'
 import { theme } from '../theme'
 
@@ -15,6 +15,7 @@ export default function QuickCapture() {
   const [saving, setSaving] = useState(false)
   const [prioritized, setPrioritized] = useState(false)
   const [scheduledToday, setScheduledToday] = useState(false)
+  const [shoppingList, setShoppingList] = useState(false)
   const [tagInput, setTagInput] = useState('')
   const [tagKind, setTagKind] = useState('category')
 
@@ -22,6 +23,7 @@ export default function QuickCapture() {
     setText('')
     setPrioritized(false)
     setScheduledToday(false)
+    setShoppingList(false)
     setTagInput('')
     setTagKind('category')
     setOpen(false)
@@ -37,6 +39,7 @@ export default function QuickCapture() {
     // pill elsewhere.
     if (prioritized) await togglePrioritized(item.id)
     if (scheduledToday) await scheduleToday(item.id)
+    if (shoppingList) await toggleShoppingList(item.id)
     const tagName = tagInput.trim()
     if (tagName) {
       const tag = await findOrCreateTag(tagName, tagKind)
@@ -131,6 +134,9 @@ export default function QuickCapture() {
               </button>
               <button onClick={() => setScheduledToday((v) => !v)} style={scheduledToday ? pillActive : pill}>
                 {scheduledToday ? '✓ Dagens Fokus' : '+ Dagens Fokus'}
+              </button>
+              <button onClick={() => setShoppingList((v) => !v)} style={shoppingList ? pillActive : pill}>
+                {shoppingList ? '✓ Inköpslista' : '+ Inköpslista'}
               </button>
             </div>
 

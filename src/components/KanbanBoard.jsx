@@ -4,11 +4,9 @@ import { arrayMove } from '@dnd-kit/sortable'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
 import { updateItem, reorderPrioritized } from '../hooks/useItems'
-import { useTags } from '../hooks/useTags'
 import { useChildrenByParent } from '../hooks/useRelations'
 import KanbanColumn from './KanbanColumn'
 import ItemDetailModal from './ItemDetailModal'
-import { theme } from '../theme'
 
 // Status changes automatically when a card moves column; manual order
 // (priority_rank) only matters within "prioriterad" — see spec.md.
@@ -22,12 +20,10 @@ const COLUMNS = [
   { id: 'klar', label: 'Klar' },
 ]
 
-export default function KanbanBoard() {
-  const [laneFilter, setLaneFilter] = useState('all')
+export default function KanbanBoard({ selectedTagIds }) {
   const [detailItemId, setDetailItemId] = useState(null)
   const items = useLiveQuery(() => db.items.toArray(), []) ?? []
   const itemTagLinks = useLiveQuery(() => db.item_tags.toArray(), []) ?? []
-  const categoryTags = useTags('category') ?? []
   const { childIdSet } = useChildrenByParent()
 
   const tagIdsByItemId = useMemo(() => {
@@ -40,9 +36,9 @@ export default function KanbanBoard() {
   }, [itemTagLinks])
 
   const visibleItems = useMemo(() => {
-    if (laneFilter === 'all') return items
-    return items.filter((i) => (tagIdsByItemId.get(i.id) ?? []).includes(laneFilter))
-  }, [items, laneFilter, tagIdsByItemId])
+    if (!selectedTagIds || selectedTagIds.size === 0) return items
+    return items.filter((i) => (tagIdsByItemId.get(i.id) ?? []).some((id) => selectedTagIds.has(id)))
+  }, [items, selectedTagIds, tagIdsByItemId])
 
   const columnsData = useMemo(() => {
     const map = {}
@@ -118,26 +114,6 @@ export default function KanbanBoard() {
 
   return (
     <div style={{ padding: '1rem' }}>
-      <div style={{ marginBottom: '1rem', display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-        <label style={{ color: theme.colors.textMuted, fontSize: '0.9rem' }}>Swimlane:</label>
-        <select
-          value={laneFilter}
-          onChange={(e) => setLaneFilter(e.target.value)}
-          style={{
-            padding: '0.4rem 0.6rem',
-            borderRadius: theme.radius.sm,
-            border: `1px solid ${theme.colors.border}`,
-            background: theme.colors.surface,
-            color: theme.colors.text,
-          }}
-        >
-          <option value="all">Visa alla</option>
-          {categoryTags.map((t) => (
-            <option key={t.id} value={t.id}>{t.name}</option>
-          ))}
-        </select>
-      </div>
-
       <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragEnd={handleDragEnd}>
         <div style={{ display: 'flex', gap: '0.75rem', overflowX: 'auto' }}>
           {COLUMNS.map((col) => (

@@ -5,9 +5,9 @@ import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } 
 import { CSS } from '@dnd-kit/utilities'
 import { db } from '../lib/db'
 import {
-  updateItem, deleteItem, cloneItem, setRecurrence,
+  updateItem, deleteItem, cloneItem, setRecurrence, setRecurrenceWeekdays,
   addChildItem, removeChildRelation, reorderChildren, markDoneWithConfirm,
-  pauseItem, resumeItem,
+  pauseItem, resumeItem, toggleShoppingList,
 } from '../hooks/useItems'
 import { findOrCreateTag, useItemTags } from '../hooks/useTags'
 import { useChildren, useParent } from '../hooks/useRelations'
@@ -26,6 +26,16 @@ const RECURRENCE_PRESETS = [
   { value: '7', label: '🔁 Varje vecka' },
   { value: '14', label: '🔁 Var 14:e dag' },
   { value: 'custom', label: '🔁 Anpassat…' },
+  { value: 'weekdays', label: '🔁 Vissa veckodagar…' },
+]
+const WEEKDAYS = [
+  { value: 1, label: 'Mån' },
+  { value: 2, label: 'Tis' },
+  { value: 3, label: 'Ons' },
+  { value: 4, label: 'Tor' },
+  { value: 5, label: 'Fre' },
+  { value: 6, label: 'Lör' },
+  { value: 7, label: 'Sön' },
 ]
 const PAUSE_PRESETS = [
   { months: 1, label: '1 månad' },
@@ -49,6 +59,7 @@ export default function ItemDetailModal({ itemId, onClose }) {
   const [tagInput, setTagInput] = useState('')
   const [childInput, setChildInput] = useState('')
   const [customRecurrence, setCustomRecurrence] = useState(false)
+  const [showWeekdays, setShowWeekdays] = useState(false)
   const [uploading, setUploading] = useState(false)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
@@ -76,17 +87,30 @@ export default function ItemDetailModal({ itemId, onClose }) {
     await reorderChildren(item.id, reordered.map((c) => c.id))
   }
 
-  const recurrencePreset = [7, 14].includes(item.recurrence_days)
-    ? String(item.recurrence_days)
-    : (item.recurrence_days ? 'custom' : '')
+  const recurrencePreset = item.recurrence_weekdays?.length
+    ? 'weekdays'
+    : ([7, 14].includes(item.recurrence_days) ? String(item.recurrence_days) : (item.recurrence_days ? 'custom' : ''))
 
   function handleRecurrenceChange(value) {
     if (value === 'custom') {
       setCustomRecurrence(true)
+      setShowWeekdays(false)
+      return
+    }
+    if (value === 'weekdays') {
+      setShowWeekdays(true)
+      setCustomRecurrence(false)
       return
     }
     setCustomRecurrence(false)
+    setShowWeekdays(false)
     setRecurrence(item.id, value ? Number(value) : null)
+  }
+
+  function toggleWeekday(day) {
+    const current = item.recurrence_weekdays ?? []
+    const next = current.includes(day) ? current.filter((d) => d !== day) : [...current, day].sort()
+    setRecurrenceWeekdays(item.id, next)
   }
 
   async function addTag(kind) {
@@ -238,6 +262,15 @@ export default function ItemDetailModal({ itemId, onClose }) {
               style={selectStyle}
             />
           </div>
+          <div>
+            <label style={labelStyle}>Inköpslista</label>
+            <button
+              onClick={() => toggleShoppingList(item.id)}
+              style={item.in_shopping_list ? { ...secondaryBtn, background: theme.colors.primary, color: theme.colors.textOnPrimary, borderColor: theme.colors.primary } : secondaryBtn}
+            >
+              {item.in_shopping_list ? '✓ I inköpslistan' : '+ Inköpslista'}
+            </button>
+          </div>
         </div>
 
         <label style={labelStyle}>Upprepning</label>
@@ -264,6 +297,22 @@ export default function ItemDetailModal({ itemId, onClose }) {
               onKeyDown={(e) => e.key === 'Enter' && e.target.blur()}
               style={{ ...inputStyle, width: '110px' }}
             />
+          )}
+          {(showWeekdays || recurrencePreset === 'weekdays') && (
+            <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', width: '100%' }}>
+              {WEEKDAYS.map((w) => {
+                const active = (item.recurrence_weekdays ?? []).includes(w.value)
+                return (
+                  <button
+                    key={w.value}
+                    onClick={() => toggleWeekday(w.value)}
+                    style={active ? weekdayPillActive : weekdayPill}
+                  >
+                    {w.label}
+                  </button>
+                )
+              })}
+            </div>
           )}
         </div>
 
@@ -462,6 +511,24 @@ const secondaryBtn = {
   padding: '0.4rem 0.8rem',
   cursor: 'pointer',
   fontSize: '0.85rem',
+}
+
+const weekdayPill = {
+  fontSize: '0.8rem',
+  border: `1px solid ${theme.colors.border}`,
+  borderRadius: '999px',
+  padding: '0.3rem 0.65rem',
+  background: 'transparent',
+  color: theme.colors.textMuted,
+  cursor: 'pointer',
+}
+
+const weekdayPillActive = {
+  ...weekdayPill,
+  border: `1px solid ${theme.colors.primary}`,
+  background: theme.colors.primary,
+  color: theme.colors.textOnPrimary,
+  fontWeight: 600,
 }
 
 const miniLinkBtn = {

@@ -5,9 +5,11 @@ import BacklogView from './components/BacklogView'
 import PrioListView from './components/PrioListView'
 import KanbanBoard from './components/KanbanBoard'
 import UtfordaView from './components/UtfordaView'
+import ShoppingListView from './components/ShoppingListView'
+import ShareListManager from './components/ShareListManager'
 import AccountPanel from './components/AccountPanel'
 import TabMenu from './components/TabMenu'
-import TagFilterButton from './components/TagFilterButton'
+import TagChipBar from './components/TagChipBar'
 import RegistrationScreen from './components/RegistrationScreen'
 import { useSyncStore } from './store/syncStore'
 import { useProfile } from './hooks/useProfile'
@@ -19,12 +21,23 @@ const TABS = [
   { id: 'backlog', label: 'Backlog' },
   { id: 'prio', label: 'Prio' },
   { id: 'kanban', label: 'Kanban' },
+  { id: 'shopping', label: 'Inköpslista' },
   { id: 'utforda', label: 'Utförda' },
+  { id: 'dela', label: 'Dela' },
 ]
+
+// Tabs where a tag chip makes sense as a filter — every list/board view.
+const TAG_FILTER_TABS = new Set(['fokus', 'backlog', 'prio', 'kanban', 'shopping', 'utforda'])
 
 export default function KandoApp() {
   const [tab, setTab] = useState('fokus')
-  const [tagFilter, setTagFilter] = useState(null)
+  const [selectedTagIds, setSelectedTagIds] = useState(() => new Set())
+  const toggleTag = (id) =>
+    setSelectedTagIds((prev) => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
   const initSync = useSyncStore((s) => s.init)
   const session = useSyncStore((s) => s.session)
   const setPassword = useSyncStore((s) => s.setPassword)
@@ -74,9 +87,6 @@ export default function KandoApp() {
           <strong style={{ fontSize: '1.1rem' }}>KanDo</strong>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <AccountPanel />
-            {(tab === 'backlog' || tab === 'prio') && (
-              <TagFilterButton tagFilter={tagFilter} setTagFilter={setTagFilter} />
-            )}
             <TabMenu tabs={TABS} tab={tab} setTab={setTab} />
           </div>
         </div>
@@ -92,12 +102,18 @@ export default function KandoApp() {
         </div>
       </header>
 
+      {TAG_FILTER_TABS.has(tab) && (
+        <TagChipBar selectedTagIds={selectedTagIds} onToggle={toggleTag} />
+      )}
+
       <main style={{ paddingBottom: '5rem' }}>
-        {tab === 'fokus' && <DagensFokus />}
-        {tab === 'backlog' && <BacklogView tagFilter={tagFilter} />}
-        {tab === 'prio' && <PrioListView tagFilter={tagFilter} />}
-        {tab === 'kanban' && <KanbanBoard />}
-        {tab === 'utforda' && <UtfordaView />}
+        {tab === 'fokus' && <DagensFokus selectedTagIds={selectedTagIds} />}
+        {tab === 'backlog' && <BacklogView selectedTagIds={selectedTagIds} />}
+        {tab === 'prio' && <PrioListView selectedTagIds={selectedTagIds} />}
+        {tab === 'kanban' && <KanbanBoard selectedTagIds={selectedTagIds} />}
+        {tab === 'shopping' && <ShoppingListView selectedTagIds={selectedTagIds} />}
+        {tab === 'utforda' && <UtfordaView selectedTagIds={selectedTagIds} />}
+        {tab === 'dela' && <ShareListManager />}
       </main>
 
       <QuickCapture />

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
-import { updateItem, deleteItem, markDoneWithConfirm, scheduleToday, unschedule, setRecurrence, togglePrioritized, resumeItem } from '../hooks/useItems'
+import { updateItem, deleteItem, markDoneWithConfirm, scheduleToday, unschedule, setRecurrence, togglePrioritized, resumeItem, toggleShoppingList } from '../hooks/useItems'
 import { findOrCreateTag, useItemTags } from '../hooks/useTags'
 import { useChildrenByParent } from '../hooks/useRelations'
 import ItemDetailModal from './ItemDetailModal'
@@ -32,25 +32,25 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10)
 }
 
-export default function BacklogView({ tagFilter }) {
+export default function BacklogView({ selectedTagIds }) {
   const [typeFilter, setTypeFilter] = useState('all')
   const [detailItemId, setDetailItemId] = useState(null)
   const [showPaused, setShowPaused] = useState(false)
-  // Parents with children start expanded (matches the previous
-  // always-shown behavior) — collapsing is an opt-in per parent.
-  const [collapsedParents, setCollapsedParents] = useState(() => new Set())
+  // Parents with many children take up a lot of space, so they start
+  // collapsed — expanding is an opt-in per parent.
+  const [expandedParents, setExpandedParents] = useState(() => new Set())
   const toggleParent = (id) =>
-    setCollapsedParents((prev) => {
+    setExpandedParents((prev) => {
       const next = new Set(prev)
       next.has(id) ? next.delete(id) : next.add(id)
       return next
     })
   const { childrenByParent, childIdSet } = useChildrenByParent()
   const taggedItemIds = useLiveQuery(async () => {
-    if (!tagFilter) return null
-    const links = await db.item_tags.where('tag_id').equals(tagFilter).toArray()
+    if (!selectedTagIds || selectedTagIds.size === 0) return null
+    const links = await db.item_tags.where('tag_id').anyOf([...selectedTagIds]).toArray()
     return new Set(links.map((l) => l.item_id))
-  }, [tagFilter])
+  }, [selectedTagIds])
   const allItems = useLiveQuery(
     async () => {
       const all = await db.items.orderBy('created_at').reverse().toArray()
@@ -68,9 +68,9 @@ export default function BacklogView({ tagFilter }) {
 
   const visible = useMemo(() => {
     let result = typeFilter === 'all' ? items : items.filter((i) => i.type === typeFilter)
-    if (tagFilter && taggedItemIds) result = result.filter((i) => taggedItemIds.has(i.id))
+    if (selectedTagIds?.size > 0 && taggedItemIds) result = result.filter((i) => taggedItemIds.has(i.id))
     return result
-  }, [items, typeFilter, tagFilter, taggedItemIds])
+  }, [items, typeFilter, selectedTagIds, taggedItemIds])
   // Children render nested under their parent instead of as separate
   // top-level rows — see spec discussion: "presenteras ihop i Backlog".
   const topLevel = useMemo(() => visible.filter((i) => !childIdSet.has(i.id)), [visible, childIdSet])
@@ -100,7 +100,7 @@ export default function BacklogView({ tagFilter }) {
       <div style={itemGridStyle}>
         {topLevel.map((item) => {
           const children = childrenByParent.get(item.id) ?? []
-          const collapsed = collapsedParents.has(item.id)
+          const collapsed = !expandedParents.has(item.id)
           return (
             <div key={item.id}>
               <BacklogItemRow
@@ -450,6 +450,21 @@ function BacklogItemRow({ item, onOpenDetail, childCount = 0, collapsed = false,
           }}
         >
           {isScheduledToday ? '✓ I Dagens Fokus' : '+ Dagens Fokus'}
+        </button>
+
+        <button
+          onClick={() => toggleShoppingList(item.id)}
+          style={{
+            fontSize: '0.75rem',
+            border: `1px solid ${item.in_shopping_list ? theme.colors.primary : theme.colors.border}`,
+            borderRadius: '999px',
+            padding: '0.2rem 0.6rem',
+            background: item.in_shopping_list ? theme.colors.primary : 'transparent',
+            color: item.in_shopping_list ? theme.colors.textOnPrimary : theme.colors.textMuted,
+            cursor: 'pointer',
+          }}
+        >
+          {item.in_shopping_list ? '✓ Inköpslista' : '+ Inköpslista'}
         </button>
 
         <select

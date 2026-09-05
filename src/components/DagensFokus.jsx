@@ -36,16 +36,16 @@ function byPriorityThenRank(a, b) {
   return (a.priority_rank ?? 999999) - (b.priority_rank ?? 999999)
 }
 
-export default function DagensFokus() {
+export default function DagensFokus({ selectedTagIds }) {
   const [showDone, setShowDone] = useState(false)
   const [detailItemId, setDetailItemId] = useState(null)
   const [selectedDate, setSelectedDate] = useState(todayISO())
   const [groupByTag, setGroupByTag] = useState(false)
-  // Parents with children start expanded (matches the previous
-  // always-shown behavior) — collapsing is an opt-in per parent.
-  const [collapsedParents, setCollapsedParents] = useState(() => new Set())
+  // Parents with many children take up a lot of space, so they start
+  // collapsed — expanding is an opt-in per parent.
+  const [expandedParents, setExpandedParents] = useState(() => new Set())
   const toggleParent = (id) =>
-    setCollapsedParents((prev) => {
+    setExpandedParents((prev) => {
       const next = new Set(prev)
       next.has(id) ? next.delete(id) : next.add(id)
       return next
@@ -67,7 +67,17 @@ export default function DagensFokus() {
   }, [isToday])
 
   const showScheduled = (scheduled?.length ?? 0) > 0
-  const rawList = showScheduled ? scheduled : (topPriority ?? [])
+  const unfilteredList = showScheduled ? scheduled : (topPriority ?? [])
+
+  const taggedItemIds = useLiveQuery(async () => {
+    if (!selectedTagIds || selectedTagIds.size === 0) return null
+    const links = await db.item_tags.where('tag_id').anyOf([...selectedTagIds]).toArray()
+    return new Set(links.map((l) => l.item_id))
+  }, [selectedTagIds])
+  const rawList = useMemo(
+    () => (selectedTagIds?.size > 0 && taggedItemIds ? unfilteredList.filter((i) => taggedItemIds.has(i.id)) : unfilteredList),
+    [unfilteredList, selectedTagIds, taggedItemIds]
+  )
 
   const activeItems = useMemo(
     () => rawList.filter((i) => i.status !== 'klar').sort(byPriorityThenRank),
@@ -262,7 +272,7 @@ export default function DagensFokus() {
           <div style={itemGridStyle}>
             {activeTopLevel.map((item) => {
               const children = (childrenByParent.get(item.id) ?? []).filter((c) => activeIdSet.has(c.id))
-              const collapsed = collapsedParents.has(item.id)
+              const collapsed = !expandedParents.has(item.id)
               return (
                 <div key={item.id}>
                   <FocusRow

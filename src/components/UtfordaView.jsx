@@ -72,11 +72,20 @@ function monthLabel(key) {
   return label.charAt(0).toUpperCase() + label.slice(1)
 }
 
-export default function UtfordaView() {
-  const items = useLiveQuery(async () => {
+export default function UtfordaView({ selectedTagIds }) {
+  const allItems = useLiveQuery(async () => {
     const all = await db.items.where('status').equals('klar').toArray()
     return all.sort((a, b) => new Date(b.completed_at) - new Date(a.completed_at))
   }, []) ?? []
+
+  const taggedItemIds = useLiveQuery(async () => {
+    if (!selectedTagIds || selectedTagIds.size === 0) return null
+    const links = await db.item_tags.where('tag_id').anyOf([...selectedTagIds]).toArray()
+    return new Set(links.map((l) => l.item_id))
+  }, [selectedTagIds])
+  const items = selectedTagIds?.size > 0 && taggedItemIds
+    ? allItems.filter((i) => taggedItemIds.has(i.id))
+    : allItems
 
   const groups = groupByRecency(items)
 

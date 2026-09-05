@@ -324,9 +324,11 @@ async function maybeOfferToCompleteParent(childId) {
 }
 
 // Recurring items marked done reappear in Backlog once their frequency
-// elapses, instead of staying in Utförda forever. Runs on app load — this
-// is a local-first app with no server cron, so "due" is checked whenever
-// a device happens to open the app.
+// elapses, instead of staying in Utförda forever — and land directly in
+// today's Dagens Fokus too (not just Backlog), since "do this every Friday"
+// should actually show up in today's focus on Friday, not require digging
+// it back out of Backlog. Runs on app load — this is a local-first app with
+// no server cron, so "due" is checked whenever a device happens to open it.
 export async function reactivateDueRecurringItems() {
   const today = todayISO()
   const due = await db.items
@@ -337,7 +339,7 @@ export async function reactivateDueRecurringItems() {
       status: 'backlog',
       completed_at: null,
       next_due_date: null,
-      scheduled_date: null, // stale from the previous cycle, not this one
+      scheduled_date: today,
     })
   }
 }

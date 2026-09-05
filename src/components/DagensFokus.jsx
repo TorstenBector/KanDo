@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
-import { markDoneWithConfirm, reopenItem, sendToBacklog } from '../hooks/useItems'
+import { markDoneWithConfirm, reopenItem, sendToBacklog, scheduleToday } from '../hooks/useItems'
 import { useChildrenByParent } from '../hooks/useRelations'
 import ItemDetailModal from './ItemDetailModal'
 import { theme } from '../theme'
@@ -41,6 +41,7 @@ export default function DagensFokus({ selectedTagIds }) {
   const [detailItemId, setDetailItemId] = useState(null)
   const [selectedDate, setSelectedDate] = useState(todayISO())
   const [groupByTag, setGroupByTag] = useState(false)
+  const [reviewMode, setReviewMode] = useState(false)
   // Parents with many children take up a lot of space, so they start
   // collapsed — expanding is an opt-in per parent.
   const [expandedParents, setExpandedParents] = useState(() => new Set())
@@ -147,6 +148,19 @@ export default function DagensFokus({ selectedTagIds }) {
     return sorted
   }, [groupByTag, tagsByItemId, activeItems])
 
+  // "Vill se alla KanDos som tidigare varit satta som Dagens Fokus men som
+  // inte blivit utförda" — every day scheduled before today that never got
+  // marked done, regardless of which day it was, reviewed one at a time.
+  const today = todayISO()
+  const allMissed = useLiveQuery(async () => {
+    const all = await db.items.where('scheduled_date').below(today).toArray()
+    return all.filter((i) => i.status !== 'klar').sort((a, b) => a.scheduled_date.localeCompare(b.scheduled_date))
+  }, [today]) ?? []
+  const missedItems = useMemo(
+    () => (selectedTagIds?.size > 0 && taggedItemIds ? allMissed.filter((i) => taggedItemIds.has(i.id)) : allMissed),
+    [allMissed, selectedTagIds, taggedItemIds]
+  )
+
   return (
     <div style={{ padding: '1rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 0 0.5rem' }}>
@@ -175,8 +189,28 @@ export default function DagensFokus({ selectedTagIds }) {
         >
           🏷 Gruppera efter tagg
         </button>
+        {missedItems.length > 0 && (
+          <button
+            onClick={() => setReviewMode((r) => !r)}
+            style={{
+              border: `1px solid ${reviewMode ? theme.colors.primary : theme.colors.warning}`,
+              background: reviewMode ? theme.colors.primary : theme.colors.surface,
+              color: reviewMode ? theme.colors.textOnPrimary : theme.colors.text,
+              borderRadius: theme.radius.sm,
+              padding: '0.35rem 0.6rem',
+              fontSize: '0.8rem',
+              cursor: 'pointer',
+            }}
+          >
+            🔁 Missade ({missedItems.length})
+          </button>
+        )}
       </div>
 
+      {reviewMode ? (
+        <MissedReview items={missedItems} onOpenDetail={setDetailItemId} onClose={() => setReviewMode(false)} />
+      ) : (
+        <>
       {isToday && !showScheduled && (
         <p style={{ color: theme.colors.textMuted, fontSize: '0.85rem', margin: '0 0 0.75rem' }}>
           Inget schemalagt idag — de fem högst prioriterade
@@ -296,8 +330,131 @@ export default function DagensFokus({ selectedTagIds }) {
           </div>
         )}
       </div>
+        </>
+      )}
 
       <ItemDetailModal itemId={detailItemId} onClose={() => setDetailItemId(null)} />
+    </div>
+  )
+}
+
+const SWIPE_THRESHOLD = 90
+
+// One at a time, Tinder-style: swipe right (or the button) reschedules to
+// today for a fresh attempt; swipe left (or the button) sends it back to
+// Backlog without a date, off today's radar until re-triaged from there.
+function MissedReview({ items, onOpenDetail, onClose }) {
+  const item = items[0]
+
+  if (!item) {
+    return (
+      <div style={{ padding: '1.5rem 0', textAlign: 'center' }}>
+        <p style={{ color: theme.colors.textMuted, margin: '0 0 0.75rem' }}>Inga fler missade — bra jobbat! 🎉</p>
+        <button onClick={onClose} style={{ ...dateNavBtn, width: 'auto', padding: '0 0.8rem' }}>Stäng genomgång</button>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ padding: '1rem 0 1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+      <MissedCard
+        key={item.id}
+        item={item}
+        onOpenDetail={onOpenDetail}
+        onSwipeRight={() => scheduleToday(item.id)}
+        onSwipeLeft={() => sendToBacklog(item.id)}
+      />
+      <div style={{ display: 'flex', gap: '0.75rem' }}>
+        <button onClick={() => sendToBacklog(item.id)} style={{ ...secondaryReviewBtn, color: theme.colors.textMuted }}>
+          ← Backlog
+        </button>
+        <button onClick={() => scheduleToday(item.id)} style={{ ...secondaryReviewBtn, color: theme.colors.success, borderColor: theme.colors.success }}>
+          Dagens Fokus →
+        </button>
+      </div>
+      <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: theme.colors.textMuted, fontSize: '0.8rem', cursor: 'pointer' }}>
+        ✕ Stäng genomgång
+      </button>
+    </div>
+  )
+}
+
+function MissedCard({ item, onOpenDetail, onSwipeRight, onSwipeLeft }) {
+  const [dragX, setDragX] = useState(0)
+  const [dragging, setDragging] = useState(false)
+  const startXRef = useRef(0)
+  const movedRef = useRef(false)
+
+  function handlePointerDown(e) {
+    setDragging(true)
+    movedRef.current = false
+    startXRef.current = e.clientX
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+  function handlePointerMove(e) {
+    if (!dragging) return
+    const delta = e.clientX - startXRef.current
+    if (Math.abs(delta) > 4) movedRef.current = true
+    setDragX(delta)
+  }
+  function handlePointerUp() {
+    setDragging(false)
+    if (dragX > SWIPE_THRESHOLD) onSwipeRight()
+    else if (dragX < -SWIPE_THRESHOLD) onSwipeLeft()
+    setDragX(0)
+  }
+
+  const rotation = dragX / 18
+  const rightHintOpacity = Math.min(Math.max(dragX / SWIPE_THRESHOLD, 0), 1)
+  const leftHintOpacity = Math.min(Math.max(-dragX / SWIPE_THRESHOLD, 0), 1)
+
+  return (
+    <div
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
+      onClick={() => { if (!movedRef.current) onOpenDetail(item.id) }}
+      style={{
+        position: 'relative',
+        width: '100%',
+        maxWidth: '360px',
+        background: theme.colors.surface,
+        border: `1px solid ${theme.colors.border}`,
+        borderRadius: theme.radius.md,
+        padding: '1.2rem 1rem',
+        boxShadow: theme.shadow.md,
+        transform: `translateX(${dragX}px) rotate(${rotation}deg)`,
+        transition: dragging ? 'none' : 'transform 0.25s ease',
+        touchAction: 'pan-y',
+        cursor: dragging ? 'grabbing' : 'grab',
+        userSelect: 'none',
+      }}
+    >
+      <span
+        style={{
+          position: 'absolute', top: '0.6rem', right: '0.8rem',
+          fontWeight: 700, fontSize: '0.9rem', color: theme.colors.success,
+          opacity: rightHintOpacity, textTransform: 'uppercase',
+        }}
+      >
+        Idag ✓
+      </span>
+      <span
+        style={{
+          position: 'absolute', top: '0.6rem', left: '0.8rem',
+          fontWeight: 700, fontSize: '0.9rem', color: theme.colors.textMuted,
+          opacity: leftHintOpacity, textTransform: 'uppercase',
+        }}
+      >
+        Backlog
+      </span>
+      <div style={{ fontSize: '0.7rem', color: theme.colors.textMuted, textTransform: 'uppercase', marginTop: '1rem' }}>
+        {TYPE_LABEL[item.type]} · Missade sedan {formatDateLabel(item.scheduled_date)}
+      </div>
+      <div style={{ color: theme.colors.text, fontWeight: 600, fontSize: '1.1rem', marginTop: '0.3rem' }}>
+        {item.title}
+      </div>
     </div>
   )
 }
@@ -406,6 +563,16 @@ const itemGridStyle = {
   gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
   gap: '0.75rem',
   alignItems: 'start',
+}
+
+const secondaryReviewBtn = {
+  border: `1px solid ${theme.colors.border}`,
+  background: theme.colors.surface,
+  borderRadius: '999px',
+  padding: '0.5rem 1.1rem',
+  fontSize: '0.9rem',
+  fontWeight: 600,
+  cursor: 'pointer',
 }
 
 const dateNavBtn = {

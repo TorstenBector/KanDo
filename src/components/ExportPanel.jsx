@@ -32,6 +32,7 @@ async function buildExportText(selectedTagIds) {
       .where({ from_item_id: item.id, relation_type: 'parent_child' })
       .toArray()
     const children = (await db.items.bulkGet(relations.map((r) => r.to_item_id))).filter(Boolean)
+    const imageCount = await db.item_images.where('item_id').equals(item.id).count()
 
     const meta = [TYPE_LABEL[item.type], STATUS_LABEL[item.status]]
     if (item.backlog_priority) meta.push(`Prio: ${PRIORITY_LABEL[item.backlog_priority]}`)
@@ -46,6 +47,14 @@ async function buildExportText(selectedTagIds) {
       for (const child of children) {
         lines.push(`- [${child.status === 'klar' ? 'x' : ' '}] ${child.title}`)
       }
+    }
+    // Plain text can't usefully carry an image — a raw base64 string
+    // pasted into a chat isn't something an AI can actually look at. Flag
+    // that photos exist instead, and point at the actual way to hand them
+    // over: a shared link (Dela-fliken), whose get_shared_item_detail RPC
+    // returns the real image data for anyone (including an AI) to fetch.
+    if (imageCount > 0) {
+      lines.push(`📷 ${imageCount} bild${imageCount === 1 ? '' : 'er'} bifogad${imageCount === 1 ? '' : 'e'} (ej med i textexport — dela en länk via "Dela" för bildåtkomst)`)
     }
     lines.push('')
   }

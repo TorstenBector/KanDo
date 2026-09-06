@@ -259,6 +259,23 @@ function SharedItemDetailModal({ token, itemId, onClose }) {
               </div>
             )}
 
+            {detail.images?.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                {detail.images.map((img) => (
+                  <a key={img.id} href={img.data_url} target="_blank" rel="noreferrer">
+                    <img
+                      src={img.data_url}
+                      alt=""
+                      style={{
+                        width: '4.5rem', height: '4.5rem', objectFit: 'cover',
+                        borderRadius: theme.radius.sm, border: `1px solid ${theme.colors.border}`, display: 'block',
+                      }}
+                    />
+                  </a>
+                ))}
+              </div>
+            )}
+
             {detail.children?.length > 0 && (
               <>
                 <div style={{ fontSize: '0.75rem', color: theme.colors.textMuted, fontWeight: 600, margin: '0 0 0.3rem' }}>

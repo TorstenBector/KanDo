@@ -11,6 +11,7 @@ import TagManagementView from './components/TagManagementView'
 import AccountPanel from './components/AccountPanel'
 import TabMenu from './components/TabMenu'
 import TagChipBar from './components/TagChipBar'
+import ExportPanel from './components/ExportPanel'
 import RegistrationScreen from './components/RegistrationScreen'
 import { useSyncStore } from './store/syncStore'
 import { useProfile } from './hooks/useProfile'
@@ -34,6 +35,7 @@ const TAG_FILTER_TABS = new Set(['fokus', 'backlog', 'prio', 'kanban', 'shopping
 export default function KandoApp() {
   const [tab, setTab] = useState('fokus')
   const [selectedTagIds, setSelectedTagIds] = useState(() => new Set())
+  const [exportOpen, setExportOpen] = useState(false)
   const toggleTag = (id) =>
     setSelectedTagIds((prev) => {
       const next = new Set(prev)
@@ -105,7 +107,34 @@ export default function KandoApp() {
       </header>
 
       {TAG_FILTER_TABS.has(tab) && (
-        <TagChipBar selectedTagIds={selectedTagIds} onToggle={toggleTag} />
+        <div style={{ display: 'flex', alignItems: 'center', background: theme.colors.bg, borderBottom: `1px solid ${theme.colors.border}` }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <TagChipBar selectedTagIds={selectedTagIds} onToggle={toggleTag} />
+          </div>
+          {selectedTagIds.size > 0 && (
+            <button
+              onClick={() => setExportOpen(true)}
+              title="Exportera markerade taggar som text"
+              style={{
+                flexShrink: 0,
+                margin: '0 0.75rem',
+                border: `1px solid ${theme.colors.border}`,
+                background: theme.colors.surface,
+                color: theme.colors.text,
+                borderRadius: theme.radius.sm,
+                padding: '0.35rem 0.6rem',
+                fontSize: '0.8rem',
+                cursor: 'pointer',
+              }}
+            >
+              📋 Exportera
+            </button>
+          )}
+        </div>
+      )}
+
+      {exportOpen && (
+        <ExportPanel selectedTagIds={selectedTagIds} onClose={() => setExportOpen(false)} />
       )}
 
       <main style={{ paddingBottom: '5rem' }}>

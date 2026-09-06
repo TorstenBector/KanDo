@@ -19,8 +19,6 @@ export default function TagChipBar({ selectedTagIds, onToggle }) {
         gap: '0.4rem',
         overflowX: 'auto',
         padding: '0.6rem 1rem',
-        background: theme.colors.bg,
-        borderBottom: `1px solid ${theme.colors.border}`,
       }}
     >
       {allTags.map((tag) => {

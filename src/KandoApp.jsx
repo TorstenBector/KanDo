@@ -8,6 +8,7 @@ import UtfordaView from './components/UtfordaView'
 import ShoppingListView from './components/ShoppingListView'
 import ShareListManager from './components/ShareListManager'
 import TagManagementView from './components/TagManagementView'
+import SearchView from './components/SearchView'
 import AccountPanel from './components/AccountPanel'
 import TabMenu from './components/TabMenu'
 import TagChipBar from './components/TagChipBar'
@@ -19,6 +20,7 @@ import { reactivateDueRecurringItems, reactivatePausedItems, migrateLegacyItemSt
 import { theme } from './theme'
 
 const TABS = [
+  { id: 'sok', label: 'Sök' },
   { id: 'fokus', label: 'Dagens Fokus' },
   { id: 'backlog', label: 'Backlog' },
   { id: 'prio', label: 'Prio' },
@@ -146,6 +148,7 @@ export default function KandoApp() {
         {tab === 'utforda' && <UtfordaView selectedTagIds={selectedTagIds} />}
         {tab === 'dela' && <ShareListManager />}
         {tab === 'taggar' && <TagManagementView />}
+        {tab === 'sok' && <SearchView />}
       </main>
 
       <QuickCapture />

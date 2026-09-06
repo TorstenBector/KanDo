@@ -38,7 +38,16 @@ async function buildExportText(selectedTagIds) {
     if (item.backlog_priority) meta.push(`Prio: ${PRIORITY_LABEL[item.backlog_priority]}`)
 
     lines.push(`## ${item.title} [${meta.join(', ')}]`)
-    lines.push(item.description?.trim() || '(ingen beskrivning)')
+    // Snabbfånga trims a long capture down to an 80-char title — the fuller
+    // original thought survives in original_text. Surface it whenever there's
+    // no real description and it actually adds something the title cut off.
+    if (item.description?.trim()) {
+      lines.push(item.description.trim())
+    } else if (item.original_text?.trim() && item.original_text.trim() !== item.title.trim()) {
+      lines.push(`(ursprunglig text från Snabbfånga): ${item.original_text.trim()}`)
+    } else {
+      lines.push('(ingen beskrivning)')
+    }
     if (itemTags.length > 0) {
       lines.push(`Taggar: ${itemTags.map((t) => t.name).join(', ')}`)
     }

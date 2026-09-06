@@ -11,3 +11,15 @@ html, body, #root {
 body {
   font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
 }
+
+/* iOS Safari auto-zooms the whole page when a text input/textarea/select
+   with a computed font-size under 16px receives focus — several inputs
+   across the app (tag entry, subtask entry, etc.) use smaller inline
+   font-sizes for visual density. An !important media rule is the only way
+   to win over those inline styles without hunting down every one of them;
+   scoped to small viewports only, so desktop keeps its intended sizing. */
+@media (max-width: 600px) {
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+}

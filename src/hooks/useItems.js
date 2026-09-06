@@ -132,19 +132,40 @@ export async function reorderPrioritized(orderedIds) {
   triggerPush()
 }
 
+// Scheduling into Dagens Fokus now moves the item's Kanban status to
+// 'planerad' for real (it shows up in the Planerad column, not just
+// "also visible today") — but that would overwrite whatever the item's
+// status meant before (e.g. 'prioriterad'), so that's remembered in
+// pre_focus_status and restored by unschedule() below. Already-'planerad'
+// items don't need any of this — nothing to remember, nothing changes.
 export async function scheduleToday(id) {
-  await updateItem(id, { scheduled_date: todayISO() })
+  const item = await db.items.get(id)
+  if (!item) return
+  const changes = { scheduled_date: todayISO() }
+  if (item.status !== 'planerad') {
+    changes.pre_focus_status = item.status
+    changes.status = 'planerad'
+  }
+  await updateItem(id, changes)
 }
 
 export async function unschedule(id) {
-  await updateItem(id, { scheduled_date: null })
+  const item = await db.items.get(id)
+  if (!item) return
+  const changes = { scheduled_date: null }
+  if (item.status === 'planerad' && item.pre_focus_status) {
+    changes.status = item.pre_focus_status
+    changes.pre_focus_status = null
+  }
+  await updateItem(id, changes)
 }
 
 // Full reset to Backlog — for items pulled into Dagens Fokus (or
-// Prioriterad) too early. Unlike unschedule(), also drops status back to
-// backlog and clears priority_rank, not just the date.
+// Prioriterad) too early. Unlike unschedule(), always drops status back to
+// backlog and clears priority_rank, not just the date — regardless of
+// pre_focus_status, this is the deliberate "start over" action.
 export async function sendToBacklog(id) {
-  await updateItem(id, { status: 'backlog', scheduled_date: null, priority_rank: null })
+  await updateItem(id, { status: 'backlog', scheduled_date: null, priority_rank: null, pre_focus_status: null })
 }
 
 export async function setRecurrence(id, days) {
@@ -336,7 +357,11 @@ export async function reactivateDueRecurringItems() {
     .toArray()
   for (const item of due) {
     await updateItem(item.id, {
-      status: 'backlog',
+      // 'planerad' + pre_focus_status, same as scheduleToday() — a fresh
+      // reactivation was never meaningfully "prioritized," so sending it
+      // back out of Dagens Fokus later correctly lands it in plain Backlog.
+      status: 'planerad',
+      pre_focus_status: 'backlog',
       completed_at: null,
       next_due_date: null,
       scheduled_date: today,

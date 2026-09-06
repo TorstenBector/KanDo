@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
-import { markDoneWithConfirm, reopenItem, sendToBacklog, scheduleToday } from '../hooks/useItems'
+import { markDoneWithConfirm, reopenItem, sendToBacklog, scheduleToday, unschedule } from '../hooks/useItems'
 import { useChildrenByParent } from '../hooks/useRelations'
 import ItemDetailModal from './ItemDetailModal'
 import { theme } from '../theme'
@@ -541,23 +541,24 @@ function FocusRow({ item, showScheduled, onOpenDetail, childCount = 0, collapsed
           <span style={{ fontSize: '0.9rem', lineHeight: 1 }}>{collapsed ? '+' : '−'}</span>
         </button>
       )}
-      {showScheduled && (
-        <button
-          onClick={() => sendToBacklog(item.id)}
-          title="Tillbaka till Backlog"
-          style={{
-            border: `1px solid ${theme.colors.border}`,
-            background: 'transparent',
-            borderRadius: theme.radius.sm,
-            padding: '0.25rem 0.5rem',
-            fontSize: '0.7rem',
-            color: theme.colors.textMuted,
-            cursor: 'pointer',
-            flexShrink: 0,
-          }}
-        >
-          ← Backlog
-        </button>
+      {showScheduled && !done && (
+        item.pre_focus_status === 'prioriterad' ? (
+          <button
+            onClick={() => unschedule(item.id)}
+            title="Ta bort från idag, behåll som Prioriterad"
+            style={backButtonStyle}
+          >
+            → Prioriterad
+          </button>
+        ) : (
+          <button
+            onClick={() => sendToBacklog(item.id)}
+            title="Tillbaka till Backlog"
+            style={backButtonStyle}
+          >
+            ← Backlog
+          </button>
+        )
       )}
     </div>
   )
@@ -571,6 +572,17 @@ const itemGridStyle = {
   gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))',
   gap: '0.75rem',
   alignItems: 'start',
+}
+
+const backButtonStyle = {
+  border: `1px solid ${theme.colors.border}`,
+  background: 'transparent',
+  borderRadius: theme.radius.sm,
+  padding: '0.25rem 0.5rem',
+  fontSize: '0.7rem',
+  color: theme.colors.textMuted,
+  cursor: 'pointer',
+  flexShrink: 0,
 }
 
 const secondaryReviewBtn = {

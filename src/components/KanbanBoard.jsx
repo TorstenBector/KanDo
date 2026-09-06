@@ -12,8 +12,10 @@ import ItemDetailModal from './ItemDetailModal'
 // (priority_rank) only matters within "prioriterad" — see spec.md.
 // Note: "Idé" is an item *type* (Idé/Projekt/Task, shown as a badge on
 // each card), not a workflow stage — it doesn't get its own column here.
+// Backlog deliberately isn't a column here — it's managed exclusively from
+// the Backlog tab; Kanban stays focused on the active workflow stages.
+// A 'backlog'-status item simply doesn't appear on this board at all.
 const COLUMNS = [
-  { id: 'backlog', label: 'Backlog' },
   { id: 'prioriterad', label: 'Prioriterad' },
   { id: 'planerad', label: 'Planerad' },
   { id: 'pagar', label: 'Pågår' },

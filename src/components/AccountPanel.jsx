@@ -25,6 +25,29 @@ export default function AccountPanel() {
     () => db.items.filter((i) => i._syncStatus === 'pending').count(),
     []
   )
+  const [updating, setUpdating] = useState(false)
+
+  // A stale PWA build (old service worker + cached assets) is a different
+  // failure mode than a sync error — this app can genuinely look out of
+  // date on one device with no error shown anywhere. This is the "nuclear"
+  // fix: drop every service worker + cache this origin has and hard-reload,
+  // guaranteeing the next load fetches the current deployed build. Doesn't
+  // touch IndexedDB — no local data is affected.
+  async function forceUpdate() {
+    setUpdating(true)
+    try {
+      if ('serviceWorker' in navigator) {
+        const registrations = await navigator.serviceWorker.getRegistrations()
+        await Promise.all(registrations.map((r) => r.unregister()))
+      }
+      if ('caches' in window) {
+        const keys = await caches.keys()
+        await Promise.all(keys.map((k) => caches.delete(k)))
+      }
+    } finally {
+      window.location.reload()
+    }
+  }
 
   async function handleSend() {
     if (!email.trim()) return
@@ -161,6 +184,12 @@ export default function AccountPanel() {
               )}
             </>
           )}
+
+          <div style={{ borderTop: `1px solid ${theme.colors.border}`, marginTop: '0.75rem', paddingTop: '0.6rem' }}>
+            <button onClick={forceUpdate} disabled={updating} style={{ ...miniLinkBtn, color: theme.colors.textMuted }}>
+              {updating ? '🔄 Uppdaterar…' : '🔄 Ser gammalt ut? Tvinga uppdatering'}
+            </button>
+          </div>
         </div>
       )}
 

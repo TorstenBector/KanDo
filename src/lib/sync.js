@@ -83,7 +83,17 @@ export async function pushPendingChanges(userId) {
 export async function pullRemoteChanges(userId) {
   if (!userId) return
 
-  const { data: remoteItems } = await supabase.from('items').select('*').eq('user_id', userId)
+  // Every one of these used to ignore `error` entirely — if a fetch failed
+  // (network hiccup, a transient PostgREST schema-cache lag right after a
+  // migration, anything), `data` came back null, `?? []`/`?.length` quietly
+  // treated that as "nothing to pull", and the sync still reported success
+  // with nothing pulled and nothing on screen ever explaining why. Now every
+  // failure is collected and surfaced as a real ⚠ Synkfel instead of a
+  // silent no-op that looks identical to "already up to date".
+  const pullErrors = []
+
+  const { data: remoteItems, error: itemsErr } = await supabase.from('items').select('*').eq('user_id', userId)
+  if (itemsErr) pullErrors.push(`KanDo's: ${itemsErr.message}`)
   for (const remote of remoteItems ?? []) {
     const local = await db.items.get(remote.id)
     if (!local || new Date(remote.updated_at) > new Date(local.updated_at)) {
@@ -91,34 +101,59 @@ export async function pullRemoteChanges(userId) {
     }
   }
 
-  const { data: remoteTags } = await supabase.from('tags').select('*').eq('user_id', userId)
+  const { data: remoteTags, error: tagsErr } = await supabase.from('tags').select('*').eq('user_id', userId)
+  if (tagsErr) pullErrors.push(`taggar: ${tagsErr.message}`)
   if (remoteTags?.length) await db.tags.bulkPut(remoteTags)
 
   // RLS scopes this to the caller's own items automatically.
-  const { data: remoteLinks } = await supabase.from('item_tags').select('item_id, tag_id')
+  const { data: remoteLinks, error: linksErr } = await supabase.from('item_tags').select('item_id, tag_id')
+  if (linksErr) pullErrors.push(`taggkopplingar: ${linksErr.message}`)
   if (remoteLinks?.length) await db.item_tags.bulkPut(remoteLinks)
 
-  const { data: remoteRelations } = await supabase.from('item_relations').select('*').eq('user_id', userId)
+  const { data: remoteRelations, error: relErr } = await supabase.from('item_relations').select('*').eq('user_id', userId)
+  if (relErr) pullErrors.push(`relationer: ${relErr.message}`)
   if (remoteRelations?.length) await db.item_relations.bulkPut(remoteRelations)
 
   // Images are immutable once created (only added/removed, never edited),
   // so only fetch the ones we don't already have locally — re-downloading
   // every existing photo's base64 content on every sync would be wasteful.
-  const { data: remoteImageIds } = await supabase.from('item_images').select('id').eq('user_id', userId)
+  const { data: remoteImageIds, error: imgIdsErr } = await supabase.from('item_images').select('id').eq('user_id', userId)
+  if (imgIdsErr) pullErrors.push(`bilder: ${imgIdsErr.message}`)
   if (remoteImageIds?.length) {
     const localIds = new Set(await db.item_images.toCollection().primaryKeys())
     const missingIds = remoteImageIds.map((r) => r.id).filter((id) => !localIds.has(id))
     if (missingIds.length > 0) {
-      const { data: fullImages } = await supabase.from('item_images').select('*').in('id', missingIds)
+      const { data: fullImages, error: imgErr } = await supabase.from('item_images').select('*').in('id', missingIds)
+      if (imgErr) pullErrors.push(`bilder: ${imgErr.message}`)
       if (fullImages?.length) {
         await db.item_images.bulkPut(fullImages.map((img) => ({ ...img, _syncStatus: 'synced' })))
       }
     }
   }
+
+  if (pullErrors.length > 0) {
+    const summary = pullErrors.length === 1
+      ? pullErrors[0]
+      : `${pullErrors.length} delar av synkningen misslyckades, t.ex. ${pullErrors[0]}`
+    throw new Error(summary)
+  }
 }
 
 export async function runFullSync(userId) {
   if (!userId) return
-  await pullRemoteChanges(userId)
-  await pushPendingChanges(userId)
+  // Run both regardless of whether the other failed — a flaky pull
+  // shouldn't also block pending local edits from at least trying to push,
+  // and vice versa. Errors from either are aggregated, not swallowed.
+  const errors = []
+  try {
+    await pullRemoteChanges(userId)
+  } catch (err) {
+    errors.push(err?.message ?? String(err))
+  }
+  try {
+    await pushPendingChanges(userId)
+  } catch (err) {
+    errors.push(err?.message ?? String(err))
+  }
+  if (errors.length > 0) throw new Error(errors.join(' | '))
 }

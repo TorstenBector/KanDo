@@ -9,6 +9,7 @@ import ShoppingListView from './components/ShoppingListView'
 import ShareListManager from './components/ShareListManager'
 import TagManagementView from './components/TagManagementView'
 import SearchView from './components/SearchView'
+import HelpView from './components/HelpView'
 import AccountPanel from './components/AccountPanel'
 import TabMenu from './components/TabMenu'
 import TagChipBar from './components/TagChipBar'
@@ -29,6 +30,7 @@ const TABS = [
   { id: 'utforda', label: 'Utförda' },
   { id: 'dela', label: 'Dela' },
   { id: 'taggar', label: 'Tagghantering' },
+  { id: 'hjalp', label: 'Hjälp' },
 ]
 
 // Tabs where a tag chip makes sense as a filter — every list/board view.
@@ -149,6 +151,7 @@ export default function KandoApp() {
         {tab === 'dela' && <ShareListManager />}
         {tab === 'taggar' && <TagManagementView />}
         {tab === 'sok' && <SearchView />}
+        {tab === 'hjalp' && <HelpView />}
       </main>
 
       <QuickCapture />

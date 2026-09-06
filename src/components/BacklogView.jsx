@@ -4,6 +4,7 @@ import { db } from '../lib/db'
 import { updateItem, deleteItem, markDoneWithConfirm, scheduleToday, unschedule, setRecurrence, togglePrioritized, resumeItem, toggleShoppingList } from '../hooks/useItems'
 import { useItemTags } from '../hooks/useTags'
 import { useChildrenByParent } from '../hooks/useRelations'
+import { useEditBuffer } from '../hooks/useEditBuffer'
 import ItemDetailModal from './ItemDetailModal'
 import TagInput from './TagInput'
 import TriageReview from './TriageReview'
@@ -217,21 +218,27 @@ export default function BacklogView({ selectedTagIds }) {
 // fixed-height box, clipped and unworkable to edit. This auto-grows to fit
 // its content (like the other views' read-only title <div>s do naturally)
 // while staying an editable field, so inline renaming in Backlog still works.
-function TitleField({ value, onChange, fontSize }) {
+function TitleField({ itemId, value, onChange, fontSize }) {
   const ref = useRef(null)
+  // Buffered locally, only re-synced when switching to a different item —
+  // see useEditBuffer for why: this field's value round-trips through an
+  // async Dexie write + liveQuery re-fetch, and binding straight to that
+  // let the DOM value get reset mid-edit, snapping the cursor to the end
+  // the moment you e.g. deleted a letter.
+  const [local, setLocal] = useEditBuffer(itemId, value)
 
   useEffect(() => {
     const el = ref.current
     if (!el) return
     el.style.height = 'auto'
     el.style.height = `${el.scrollHeight}px`
-  }, [value])
+  }, [local])
 
   return (
     <textarea
       ref={ref}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
+      value={local}
+      onChange={(e) => { setLocal(e.target.value); onChange(e.target.value) }}
       onKeyDown={(e) => {
         // Titles are single-line in spirit — Enter shouldn't insert a
         // newline, just get out of the way (blur commits the edit).
@@ -328,6 +335,7 @@ function BacklogItemRow({ item, onOpenDetail, childCount = 0, collapsed = false,
             <span style={{ fontSize: '0.7rem', color: theme.colors.textMuted }}>· {item.status}</span>
           </div>
           <TitleField
+            itemId={item.id}
             value={item.title}
             onChange={(title) => updateItem(item.id, { title })}
             fontSize={isChild ? '0.87rem' : '1rem'}

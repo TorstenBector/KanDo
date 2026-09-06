@@ -12,6 +12,7 @@ import {
 import { useItemTags } from '../hooks/useTags'
 import { useChildren, useParent } from '../hooks/useRelations'
 import { useItemImages, addImage, removeImage } from '../hooks/useImages'
+import { useEditBuffer } from '../hooks/useEditBuffer'
 import { addMonthsISO } from '../lib/date'
 import TagInput from './TagInput'
 import { theme } from '../theme'
@@ -58,6 +59,12 @@ export default function ItemDetailModal({ itemId, onClose }) {
   const [showWeekdays, setShowWeekdays] = useState(false)
   const [uploading, setUploading] = useState(false)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
+  // Buffered locally, re-synced only when switching to a different item —
+  // binding straight to item.title/description let the async Dexie
+  // write + liveQuery re-fetch reset the DOM value mid-edit, snapping the
+  // cursor to the end (e.g. right after deleting a letter). See useEditBuffer.
+  const [titleDraft, setTitleDraft] = useEditBuffer(itemId, item?.title)
+  const [descriptionDraft, setDescriptionDraft] = useEditBuffer(itemId, item ? (item.description ?? '') : undefined)
 
   async function handleImageSelect(e) {
     const file = e.target.files?.[0]
@@ -180,16 +187,16 @@ export default function ItemDetailModal({ itemId, onClose }) {
             <option value="task">Task</option>
           </select>
           <input
-            value={item.title}
-            onChange={(e) => updateItem(item.id, { title: e.target.value })}
+            value={titleDraft}
+            onChange={(e) => { setTitleDraft(e.target.value); updateItem(item.id, { title: e.target.value }) }}
             style={{ ...inputStyle, flex: 1, fontWeight: 600, fontSize: '1.05rem' }}
           />
         </div>
 
         <label style={labelStyle}>Beskrivning</label>
         <textarea
-          value={item.description ?? ''}
-          onChange={(e) => updateItem(item.id, { description: e.target.value })}
+          value={descriptionDraft}
+          onChange={(e) => { setDescriptionDraft(e.target.value); updateItem(item.id, { description: e.target.value }) }}
           placeholder="Lägg till detaljer, kontext, anteckningar…"
           rows={4}
           style={{ ...inputStyle, width: '100%', resize: 'vertical', fontFamily: 'inherit', marginBottom: '0.5rem' }}

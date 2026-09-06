@@ -12,6 +12,7 @@ import {
 import { useItemTags } from '../hooks/useTags'
 import { useChildren, useParent } from '../hooks/useRelations'
 import { useItemImages, addImage, removeImage } from '../hooks/useImages'
+import { addMonthsISO } from '../lib/date'
 import TagInput from './TagInput'
 import { theme } from '../theme'
 
@@ -45,11 +46,6 @@ const PAUSE_PRESETS = [
   { months: 6, label: '6 månader' },
 ]
 
-function addMonthsISO(months) {
-  const d = new Date()
-  d.setMonth(d.getMonth() + months)
-  return d.toISOString().slice(0, 10)
-}
 
 export default function ItemDetailModal({ itemId, onClose }) {
   const item = useLiveQuery(() => (itemId ? db.items.get(itemId) : undefined), [itemId])

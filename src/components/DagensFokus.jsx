@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
 import { markDoneWithConfirm, reopenItem, sendToBacklog, scheduleToday, unschedule } from '../hooks/useItems'
 import { useChildrenByParent } from '../hooks/useRelations'
+import { todayISO, addDaysISO, parseLocalDateISO } from '../lib/date'
 import ItemDetailModal from './ItemDetailModal'
 import { theme } from '../theme'
 
@@ -10,18 +11,8 @@ const TYPE_LABEL = { idea: 'Idé', project: 'Projekt', task: 'Task' }
 const COLLAPSE_THRESHOLD = 3
 const PRIORITY_WEIGHT = { hog: 0, medel: 1, lag: 2 }
 
-function todayISO() {
-  return new Date().toISOString().slice(0, 10)
-}
-
-function addDaysISO(iso, days) {
-  const d = new Date(iso)
-  d.setDate(d.getDate() + days)
-  return d.toISOString().slice(0, 10)
-}
-
 function formatDateLabel(iso) {
-  const d = new Date(iso)
+  const d = parseLocalDateISO(iso)
   const label = d.toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })
   return label.charAt(0).toUpperCase() + label.slice(1)
 }

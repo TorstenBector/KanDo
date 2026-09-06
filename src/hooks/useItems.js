@@ -2,21 +2,12 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
 import { supabase } from '../lib/supabaseClient'
 import { useSyncStore } from '../store/syncStore'
+import { todayISO, addDaysISO, toLocalDateISO } from '../lib/date'
 
 function triggerPush() {
   // Best-effort, fire-and-forget: write-through sync per spec.md — local
   // write already happened, this just tries to get it to the server too.
   useSyncStore.getState().pushOnly()
-}
-
-function todayISO() {
-  return new Date().toISOString().slice(0, 10)
-}
-
-function addDays(isoDate, days) {
-  const d = new Date(isoDate)
-  d.setDate(d.getDate() + days)
-  return d.toISOString().slice(0, 10)
 }
 
 // ISO weekday numbers: 1=Monday .. 7=Sunday. Finds the nearest upcoming date
@@ -27,7 +18,7 @@ function nextWeekdayOccurrence(weekdays) {
     const d = new Date(today)
     d.setDate(d.getDate() + i)
     const iso = ((d.getDay() + 6) % 7) + 1
-    if (weekdays.includes(iso)) return d.toISOString().slice(0, 10)
+    if (weekdays.includes(iso)) return toLocalDateISO(d)
   }
   return null
 }
@@ -92,7 +83,7 @@ export async function markDone(id) {
   if (item?.recurrence_weekdays?.length) {
     changes.next_due_date = nextWeekdayOccurrence(item.recurrence_weekdays)
   } else if (item?.recurrence_days) {
-    changes.next_due_date = addDays(todayISO(), item.recurrence_days)
+    changes.next_due_date = addDaysISO(todayISO(), item.recurrence_days)
   }
   await updateItem(id, changes)
 }

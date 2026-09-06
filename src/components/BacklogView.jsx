@@ -6,6 +6,7 @@ import { useItemTags } from '../hooks/useTags'
 import { useChildrenByParent } from '../hooks/useRelations'
 import ItemDetailModal from './ItemDetailModal'
 import TagInput from './TagInput'
+import { todayISO } from '../lib/date'
 import { theme } from '../theme'
 
 const TYPE_TABS = [
@@ -28,10 +29,6 @@ const RECURRENCE_PRESETS = [
   { value: '14', label: '🔁 Var 14:e dag' },
   { value: 'custom', label: '🔁 Anpassat…' },
 ]
-
-function todayISO() {
-  return new Date().toISOString().slice(0, 10)
-}
 
 export default function BacklogView({ selectedTagIds }) {
   const [typeFilter, setTypeFilter] = useState('all')

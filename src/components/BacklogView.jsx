@@ -75,6 +75,15 @@ export default function BacklogView({ selectedTagIds }) {
   // Children render nested under their parent instead of as separate
   // top-level rows — see spec discussion: "presenteras ihop i Backlog".
   const topLevel = useMemo(() => visible.filter((i) => !childIdSet.has(i.id)), [visible, childIdSet])
+  // Backlog's normal list intentionally shows everything not-yet-done
+  // regardless of status (an already-Prioriterad item still shows here too,
+  // via its own "✓ I Prioriterad" pill) — but Triage's whole job is "decide:
+  // promote this out of Backlog, or leave it," so an item that's already
+  // been promoted elsewhere has no business being reviewed here. Without
+  // this, swiping right (promote) on an already-Prioriterad card actually
+  // demoted it back to Backlog instead (togglePrioritized flips based on
+  // current status) — looked exactly like "swipe right does nothing."
+  const backlogOnly = useMemo(() => topLevel.filter((i) => i.status === 'backlog'), [topLevel])
 
   return (
     <div style={{ padding: '1rem' }}>
@@ -96,7 +105,7 @@ export default function BacklogView({ selectedTagIds }) {
             {t.label}
           </button>
         ))}
-        {topLevel.length > 0 && (
+        {backlogOnly.length > 0 && (
           <button
             onClick={() => setTriageOpen((v) => !v)}
             title="Gå igenom listan ett kort i taget — swipa höger för Prioriterad, vänster för att låta den ligga kvar"
@@ -118,7 +127,7 @@ export default function BacklogView({ selectedTagIds }) {
 
       {triageOpen ? (
         <TriageReview
-          items={[...topLevel].reverse()}
+          items={[...backlogOnly].reverse()}
           promoteLabel="→ Prioriterad"
           rejectLabel="Behåll i Backlog"
           onPromote={togglePrioritized}

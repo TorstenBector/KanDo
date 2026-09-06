@@ -133,7 +133,7 @@ export default function QuickCapture() {
                 if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSave()
               }}
               placeholder="Tala (mikrofonen i tangentbordet), skriv, eller klistra in…"
-              rows={5}
+              rows={8}
               style={{
                 width: '100%',
                 borderRadius: theme.radius.sm,

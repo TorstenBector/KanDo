@@ -4,15 +4,17 @@ import { SortableContext, arrayMove, useSortable, rectSortingStrategy } from '@d
 import { CSS } from '@dnd-kit/utilities'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
-import { markDoneWithConfirm, reorderPrioritized, togglePrioritized } from '../hooks/useItems'
+import { markDoneWithConfirm, reorderPrioritized, togglePrioritized, promoteToPlanerad, sendToBacklog } from '../hooks/useItems'
 import { useChildrenByParent } from '../hooks/useRelations'
 import ItemDetailModal from './ItemDetailModal'
+import TriageReview from './TriageReview'
 import { theme } from '../theme'
 
 const TYPE_LABEL = { idea: 'Idé', project: 'Projekt', task: 'Task' }
 
 export default function PrioListView({ selectedTagIds }) {
   const [detailItemId, setDetailItemId] = useState(null)
+  const [triageOpen, setTriageOpen] = useState(false)
   // Parents with many children take up a lot of space, so they start
   // collapsed — expanding is an opt-in per parent.
   const [expandedParents, setExpandedParents] = useState(() => new Set())
@@ -55,10 +57,43 @@ export default function PrioListView({ selectedTagIds }) {
 
   return (
     <div style={{ padding: '1rem' }}>
-      <p style={{ color: theme.colors.textMuted, fontSize: '0.9rem', margin: '0 0 1rem' }}>
-        Dra för att ändra ordning. Översta är viktigast.
-      </p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 0 1rem' }}>
+        <p style={{ color: theme.colors.textMuted, fontSize: '0.9rem', margin: 0 }}>
+          Dra för att ändra ordning. Översta är viktigast.
+        </p>
+        {items.length > 0 && (
+          <button
+            onClick={() => setTriageOpen((v) => !v)}
+            title="Gå igenom listan ett kort i taget — swipa höger för Planerad, vänster för Backlog"
+            style={{
+              marginLeft: 'auto',
+              flexShrink: 0,
+              border: `1px solid ${triageOpen ? theme.colors.primary : theme.colors.border}`,
+              background: triageOpen ? theme.colors.primary : theme.colors.surface,
+              color: triageOpen ? theme.colors.textOnPrimary : theme.colors.text,
+              borderRadius: theme.radius.sm,
+              padding: '0.35rem 0.6rem',
+              fontSize: '0.8rem',
+              cursor: 'pointer',
+            }}
+          >
+            🔀 Triage
+          </button>
+        )}
+      </div>
 
+      {triageOpen ? (
+        <TriageReview
+          items={items}
+          promoteLabel="→ Planerad"
+          rejectLabel="← Backlog"
+          onPromote={promoteToPlanerad}
+          onReject={sendToBacklog}
+          onOpenDetail={setDetailItemId}
+          onClose={() => setTriageOpen(false)}
+        />
+      ) : (
+      <>
       {items.length === 0 && (
         <p style={{ color: theme.colors.textMuted }}>
           Tomt här. Flytta något hit från Backlog eller Kanban.
@@ -96,6 +131,8 @@ export default function PrioListView({ selectedTagIds }) {
           </div>
         </SortableContext>
       </DndContext>
+      </>
+      )}
 
       <ItemDetailModal itemId={detailItemId} onClose={() => setDetailItemId(null)} />
     </div>

@@ -3,10 +3,19 @@ import { DndContext, PointerSensor, closestCenter, pointerWithin, useSensor, use
 import { arrayMove } from '@dnd-kit/sortable'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
-import { updateItem, reorderPrioritized } from '../hooks/useItems'
+import { updateItem, reorderPrioritized, promoteToPagar, demoteToPrioriterad, demoteToPlanerad, markDoneWithConfirm } from '../hooks/useItems'
 import { useChildrenByParent } from '../hooks/useRelations'
 import KanbanColumn from './KanbanColumn'
 import ItemDetailModal from './ItemDetailModal'
+import TriageReview from './TriageReview'
+
+// One entry per column that offers a triage swipe-review — Prioriterad and
+// Klar are reached from Prio's own triage / the ordinary checkmark
+// respectively, so only these two adjacent-stage transitions live here.
+const TRIAGE_CONFIG = {
+  planerad: { promoteLabel: '→ Pågår', rejectLabel: '← Prioriterad', onPromote: promoteToPagar, onReject: demoteToPrioriterad },
+  pagar: { promoteLabel: '✓ Klar', rejectLabel: '← Planerad', onPromote: markDoneWithConfirm, onReject: demoteToPlanerad },
+}
 
 // Status changes automatically when a card moves column; manual order
 // (priority_rank) only matters within "prioriterad" — see spec.md.
@@ -24,6 +33,7 @@ const COLUMNS = [
 
 export default function KanbanBoard({ selectedTagIds }) {
   const [detailItemId, setDetailItemId] = useState(null)
+  const [triageStage, setTriageStage] = useState(null) // null | 'planerad' | 'pagar'
   const items = useLiveQuery(() => db.items.toArray(), []) ?? []
   const itemTagLinks = useLiveQuery(() => db.item_tags.toArray(), []) ?? []
   const { childIdSet } = useChildrenByParent()
@@ -114,12 +124,36 @@ export default function KanbanBoard({ selectedTagIds }) {
     }
   }
 
+  if (triageStage) {
+    const cfg = TRIAGE_CONFIG[triageStage]
+    return (
+      <div style={{ padding: '1rem' }}>
+        <TriageReview
+          items={[...columnsData[triageStage]].reverse()}
+          promoteLabel={cfg.promoteLabel}
+          rejectLabel={cfg.rejectLabel}
+          onPromote={cfg.onPromote}
+          onReject={cfg.onReject}
+          onOpenDetail={setDetailItemId}
+          onClose={() => setTriageStage(null)}
+        />
+        <ItemDetailModal itemId={detailItemId} onClose={() => setDetailItemId(null)} />
+      </div>
+    )
+  }
+
   return (
     <div style={{ padding: '1rem' }}>
       <DndContext sensors={sensors} collisionDetection={collisionDetection} onDragEnd={handleDragEnd}>
         <div style={{ display: 'flex', gap: '0.75rem', overflowX: 'auto' }}>
           {COLUMNS.map((col) => (
-            <KanbanColumn key={col.id} column={col} items={columnsData[col.id]} onOpenDetail={setDetailItemId} />
+            <KanbanColumn
+              key={col.id}
+              column={col}
+              items={columnsData[col.id]}
+              onOpenDetail={setDetailItemId}
+              onTriage={TRIAGE_CONFIG[col.id] ? () => setTriageStage(col.id) : null}
+            />
           ))}
         </div>
       </DndContext>

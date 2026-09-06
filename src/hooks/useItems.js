@@ -181,6 +181,28 @@ export async function toggleShoppingList(id) {
 // Direct promote/demote between Backlog and Prioriterad, without needing
 // to go through Kanban drag-and-drop — same "+X toggle" pattern as
 // scheduleToday/unschedule.
+// Triage: one-directional promote/demote between adjacent workflow stages,
+// used by the Backlog/Prio/Kanban swipe-review modes. Unlike
+// togglePrioritized (which flips based on current state), these always
+// move the same direction — the caller already knows which stage the item
+// is coming from, since it's the one being reviewed.
+export async function promoteToPlanerad(id) {
+  await updateItem(id, { status: 'planerad', priority_rank: null, kanban_entered: true })
+}
+
+export async function demoteToPrioriterad(id) {
+  const count = await db.items.where('status').equals('prioriterad').count()
+  await updateItem(id, { status: 'prioriterad', priority_rank: count, kanban_entered: true })
+}
+
+export async function promoteToPagar(id) {
+  await updateItem(id, { status: 'pagar', kanban_entered: true })
+}
+
+export async function demoteToPlanerad(id) {
+  await updateItem(id, { status: 'planerad', kanban_entered: true })
+}
+
 export async function togglePrioritized(id) {
   const item = await db.items.get(id)
   if (!item) return

@@ -6,6 +6,7 @@ import { useItemTags } from '../hooks/useTags'
 import { useChildrenByParent } from '../hooks/useRelations'
 import ItemDetailModal from './ItemDetailModal'
 import TagInput from './TagInput'
+import TriageReview from './TriageReview'
 import { todayISO } from '../lib/date'
 import { theme } from '../theme'
 
@@ -34,6 +35,7 @@ export default function BacklogView({ selectedTagIds }) {
   const [typeFilter, setTypeFilter] = useState('all')
   const [detailItemId, setDetailItemId] = useState(null)
   const [showPaused, setShowPaused] = useState(false)
+  const [triageOpen, setTriageOpen] = useState(false)
   // Parents with many children take up a lot of space, so they start
   // collapsed — expanding is an opt-in per parent.
   const [expandedParents, setExpandedParents] = useState(() => new Set())
@@ -75,7 +77,7 @@ export default function BacklogView({ selectedTagIds }) {
 
   return (
     <div style={{ padding: '1rem' }}>
-      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem' }}>
+      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1rem', alignItems: 'center' }}>
         {TYPE_TABS.map((t) => (
           <button
             key={t.id}
@@ -93,8 +95,37 @@ export default function BacklogView({ selectedTagIds }) {
             {t.label}
           </button>
         ))}
+        {topLevel.length > 0 && (
+          <button
+            onClick={() => setTriageOpen((v) => !v)}
+            title="Gå igenom listan ett kort i taget — swipa höger för Prioriterad, vänster för att låta den ligga kvar"
+            style={{
+              marginLeft: 'auto',
+              border: `1px solid ${triageOpen ? theme.colors.primary : theme.colors.border}`,
+              background: triageOpen ? theme.colors.primary : theme.colors.surface,
+              color: triageOpen ? theme.colors.textOnPrimary : theme.colors.text,
+              borderRadius: theme.radius.sm,
+              padding: '0.35rem 0.6rem',
+              fontSize: '0.8rem',
+              cursor: 'pointer',
+            }}
+          >
+            🔀 Triage
+          </button>
+        )}
       </div>
 
+      {triageOpen ? (
+        <TriageReview
+          items={[...topLevel].reverse()}
+          promoteLabel="→ Prioriterad"
+          rejectLabel="Behåll i Backlog"
+          onPromote={togglePrioritized}
+          onReject={null}
+          onOpenDetail={setDetailItemId}
+          onClose={() => setTriageOpen(false)}
+        />
+      ) : (
       <div style={itemGridStyle}>
         {topLevel.map((item) => {
           const children = childrenByParent.get(item.id) ?? []
@@ -124,6 +155,7 @@ export default function BacklogView({ selectedTagIds }) {
           <p style={{ color: theme.colors.textMuted }}>Tomt här. Använd Snabbfånga för att lägga till något.</p>
         )}
       </div>
+      )}
 
       {pausedItems.length > 0 && (
         <div style={{ marginTop: '1.25rem' }}>

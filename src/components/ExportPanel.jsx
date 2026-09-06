@@ -17,7 +17,9 @@ async function buildExportText(selectedTagIds) {
   const filterTags = (await db.tags.bulkGet(tagIdArr)).filter(Boolean)
   const links = await db.item_tags.where('tag_id').anyOf(tagIdArr).toArray()
   const itemIds = [...new Set(links.map((l) => l.item_id))]
-  const items = (await db.items.bulkGet(itemIds)).filter(Boolean)
+  // Klarmarkerat är redan gjort — inget en AI (eller du) behöver ta ställning
+  // till igen, så det utelämnas helt istället för att bara markeras klart.
+  const items = (await db.items.bulkGet(itemIds)).filter((i) => i && i.status !== 'klar')
   items.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
 
   const lines = []

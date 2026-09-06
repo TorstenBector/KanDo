@@ -4,9 +4,30 @@ import { createItem, scheduleToday, togglePrioritized, toggleShoppingList } from
 import TagInput from './TagInput'
 import { theme } from '../theme'
 
-function deriveTitle(text) {
-  const firstLine = text.trim().split('\n')[0]
-  return firstLine.length > 80 ? firstLine.slice(0, 77) + '…' : firstLine
+// The title used to just get cut at 80 chars with "…" — the rest of a long
+// spoken/typed capture was only reachable via the raw original_text field,
+// invisible everywhere else (including the export, until it grew a
+// fallback for exactly this). Now nothing is dropped: whatever doesn't fit
+// in the title flows into description instead — overflow from a long
+// first line, plus any further lines after it.
+function splitCapture(text) {
+  const trimmed = text.trim()
+  const firstLine = trimmed.split('\n')[0]
+  const restLines = trimmed.slice(firstLine.length).trim()
+
+  if (firstLine.length <= 80) {
+    return { title: firstLine, description: restLines || null }
+  }
+
+  // Cut at the last word boundary before 80 chars instead of mid-word,
+  // as long as that doesn't chop off more than half the line.
+  const slice = firstLine.slice(0, 80)
+  const lastSpace = slice.lastIndexOf(' ')
+  const cutAt = lastSpace > 40 ? lastSpace : 80
+  const title = firstLine.slice(0, cutAt).trim() + '…'
+  const overflow = firstLine.slice(cutAt).trim()
+  const description = [overflow, restLines].filter(Boolean).join('\n\n') || null
+  return { title, description }
 }
 
 export default function QuickCapture() {
@@ -31,7 +52,8 @@ export default function QuickCapture() {
     const trimmed = text.trim()
     if (!trimmed) return
     setSaving(true)
-    const item = await createItem({ type: 'idea', title: deriveTitle(trimmed), original_text: trimmed })
+    const { title, description } = splitCapture(trimmed)
+    const item = await createItem({ type: 'idea', title, original_text: trimmed, description })
     // New item always starts in Backlog — togglePrioritized flips it to
     // Prioriterad (with a correct priority_rank), same as the "+ Prioriterad"
     // pill elsewhere.

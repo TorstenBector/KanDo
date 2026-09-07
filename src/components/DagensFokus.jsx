@@ -468,16 +468,26 @@ function FocusRow({ item, showScheduled, onOpenDetail, childCount = 0, collapsed
   const movedRef = useRef(false)
 
   function handlePointerDown(e) {
-    if (done) return
+    // Capturing the pointer immediately (old code) hijacked every click
+    // inside the row — including the ✓ button — because a plain click is
+    // also a pointerdown+pointerup pair, and setPointerCapture retargets
+    // that pointerup away from whatever was actually clicked. Buttons never
+    // participate in the swipe at all; capture is deferred to the first
+    // real horizontal movement in handlePointerMove instead, so a tap with
+    // no drag never captures anything and every inner onClick fires as
+    // normal — same fix needed for the title's own onClick below.
+    if (done || e.target.closest('button')) return
     setDragging(true)
     movedRef.current = false
     startXRef.current = e.clientX
-    e.currentTarget.setPointerCapture(e.pointerId)
   }
   function handlePointerMove(e) {
     if (!dragging) return
     const delta = e.clientX - startXRef.current
-    if (Math.abs(delta) > 4) movedRef.current = true
+    if (Math.abs(delta) > 4 && !movedRef.current) {
+      movedRef.current = true
+      e.currentTarget.setPointerCapture(e.pointerId)
+    }
     setDragX(delta)
   }
   function handlePointerUp() {
@@ -553,7 +563,7 @@ function FocusRow({ item, showScheduled, onOpenDetail, childCount = 0, collapsed
       >
         ✓
       </button>
-      <div onClick={() => onOpenDetail(item.id)} style={{ flex: 1, cursor: 'pointer' }}>
+      <div onClick={() => { if (!movedRef.current) onOpenDetail(item.id) }} style={{ flex: 1, cursor: 'pointer' }}>
         <div style={{ fontSize: '0.7rem', color: theme.colors.textMuted, textTransform: 'uppercase' }}>
           {TYPE_LABEL[item.type]}
         </div>

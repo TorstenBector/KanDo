@@ -12,9 +12,14 @@ import { theme } from '../theme'
 // 🏷 tag; tap the small icon first to mark this one as a 📍 sammanhang
 // instead — a secondary, opt-in choice rather than two equally-weighted
 // buttons every time.
-export default function TagInput({ onAdd, placeholder = '+ tagg', excludeIds }) {
+// fixedKind locks this input to one kind (used by Snabbfånga, which shows
+// separate "tagg" and "position" entry points instead of one combined
+// input with a toggle) — hides the toggle button and only suggests/creates
+// that kind, so typing in the position field can't accidentally surface or
+// create a regular tag and vice versa.
+export default function TagInput({ onAdd, placeholder = '+ tagg', excludeIds, fixedKind }) {
   const [value, setValue] = useState('')
-  const [kind, setKind] = useState('category')
+  const [kind, setKind] = useState(fixedKind ?? 'category')
   const [open, setOpen] = useState(false)
   const allTags = useTags() ?? []
 
@@ -22,6 +27,7 @@ export default function TagInput({ onAdd, placeholder = '+ tagg', excludeIds }) 
   const suggestions = query
     ? allTags
         .filter((t) => t.name.toLowerCase().includes(query) && !excludeIds?.has(t.id))
+        .filter((t) => !fixedKind || t.kind === fixedKind)
         .slice(0, 6)
     : []
   const exactMatch = suggestions.some((t) => t.name.toLowerCase() === query)
@@ -29,7 +35,7 @@ export default function TagInput({ onAdd, placeholder = '+ tagg', excludeIds }) 
   async function commitNew() {
     const name = value.trim()
     if (!name) return
-    const tag = await findOrCreateTag(name, kind)
+    const tag = await findOrCreateTag(name, fixedKind ?? kind)
     onAdd(tag)
     setValue('')
     setOpen(false)
@@ -43,24 +49,28 @@ export default function TagInput({ onAdd, placeholder = '+ tagg', excludeIds }) 
 
   return (
     <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
-      <button
-        type="button"
-        onClick={() => setKind((k) => (k === 'context' ? 'category' : 'context'))}
-        title={kind === 'context' ? 'Ny tagg blir ett sammanhang (📍) — klicka för att byta' : 'Ny tagg blir en vanlig tagg — klicka för att göra den till ett sammanhang (📍)'}
-        style={{
-          border: `1px solid ${theme.colors.border}`,
-          background: kind === 'context' ? theme.colors.accentSoft : 'transparent',
-          borderRadius: '999px',
-          width: '1.6rem',
-          height: '1.6rem',
-          flexShrink: 0,
-          cursor: 'pointer',
-          fontSize: '0.8rem',
-          padding: 0,
-        }}
-      >
-        {kind === 'context' ? '📍' : '🏷'}
-      </button>
+      {fixedKind ? (
+        <span style={{ fontSize: '0.8rem', flexShrink: 0 }}>{fixedKind === 'context' ? '📍' : '🏷'}</span>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setKind((k) => (k === 'context' ? 'category' : 'context'))}
+          title={kind === 'context' ? 'Ny tagg blir ett sammanhang (📍) — klicka för att byta' : 'Ny tagg blir en vanlig tagg — klicka för att göra den till ett sammanhang (📍)'}
+          style={{
+            border: `1px solid ${theme.colors.border}`,
+            background: kind === 'context' ? theme.colors.accentSoft : 'transparent',
+            borderRadius: '999px',
+            width: '1.6rem',
+            height: '1.6rem',
+            flexShrink: 0,
+            cursor: 'pointer',
+            fontSize: '0.8rem',
+            padding: 0,
+          }}
+        >
+          {kind === 'context' ? '📍' : '🏷'}
+        </button>
+      )}
       <input
         value={value}
         onChange={(e) => { setValue(e.target.value); setOpen(true) }}
@@ -87,7 +97,7 @@ export default function TagInput({ onAdd, placeholder = '+ tagg', excludeIds }) 
           style={{
             position: 'absolute',
             top: '100%',
-            left: 0,
+            ...(fixedKind === 'context' ? { right: 0 } : { left: 0 }),
             marginTop: '0.25rem',
             background: theme.colors.bg,
             border: `1px solid ${theme.colors.border}`,

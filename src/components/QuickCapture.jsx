@@ -158,28 +158,29 @@ export default function QuickCapture() {
               </button>
             </div>
 
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', marginTop: '0.5rem', alignItems: 'center' }}>
-              {pendingTags.map((tag) => (
-                <span
-                  key={tag.id}
-                  onClick={() => setPendingTags((tags) => tags.filter((t) => t.id !== tag.id))}
-                  title="Klicka för att ta bort"
-                  style={{
-                    fontSize: '0.75rem',
-                    padding: '0.15rem 0.5rem',
-                    borderRadius: '999px',
-                    background: tag.kind === 'context' ? theme.colors.accentSoft : theme.colors.surfaceGreen,
-                    color: theme.colors.text,
-                    cursor: 'pointer',
-                  }}
-                >
-                  {tag.kind === 'context' ? '📍 ' : ''}{tag.name}
-                </span>
-              ))}
-              <TagInput
-                onAdd={(tag) => setPendingTags((tags) => (tags.some((t) => t.id === tag.id) ? tags : [...tags, tag]))}
-                excludeIds={new Set(pendingTags.map((t) => t.id))}
-              />
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.6rem', marginTop: '0.5rem' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', alignItems: 'center' }}>
+                {pendingTags.filter((t) => t.kind !== 'context').map((tag) => (
+                  <TagChip key={tag.id} tag={tag} onRemove={() => setPendingTags((tags) => tags.filter((t) => t.id !== tag.id))} />
+                ))}
+                <TagInput
+                  fixedKind="category"
+                  placeholder="+ tagg"
+                  onAdd={(tag) => setPendingTags((tags) => (tags.some((t) => t.id === tag.id) ? tags : [...tags, tag]))}
+                  excludeIds={new Set(pendingTags.map((t) => t.id))}
+                />
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '0.4rem', alignItems: 'center' }}>
+                {pendingTags.filter((t) => t.kind === 'context').map((tag) => (
+                  <TagChip key={tag.id} tag={tag} onRemove={() => setPendingTags((tags) => tags.filter((t) => t.id !== tag.id))} />
+                ))}
+                <TagInput
+                  fixedKind="context"
+                  placeholder="+ plats"
+                  onAdd={(tag) => setPendingTags((tags) => (tags.some((t) => t.id === tag.id) ? tags : [...tags, tag]))}
+                  excludeIds={new Set(pendingTags.map((t) => t.id))}
+                />
+              </div>
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.75rem' }}>
@@ -192,6 +193,26 @@ export default function QuickCapture() {
         </div>
       )}
     </>
+  )
+}
+
+function TagChip({ tag, onRemove }) {
+  return (
+    <span
+      onClick={onRemove}
+      title="Klicka för att ta bort"
+      style={{
+        fontSize: '0.75rem',
+        padding: '0.15rem 0.5rem',
+        borderRadius: '999px',
+        background: tag.kind === 'context' ? theme.colors.accentSoft : theme.colors.surfaceGreen,
+        color: theme.colors.text,
+        cursor: 'pointer',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {tag.kind === 'context' ? '📍 ' : ''}{tag.name}
+    </span>
   )
 }
 

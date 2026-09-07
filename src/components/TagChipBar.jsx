@@ -1,4 +1,4 @@
-import { useTags } from '../hooks/useTags'
+import { useTags, sortTagsByOrder } from '../hooks/useTags'
 import { theme } from '../theme'
 
 // Multi-select tag filter, shared across every list/board view — click a
@@ -6,9 +6,11 @@ import { theme } from '../theme'
 // shows only items with that tag; several selected show items matching ANY
 // of them (union, not intersection); none selected shows everything.
 export default function TagChipBar({ selectedTagIds, onToggle }) {
-  const categoryTags = useTags('category') ?? []
-  const contextTags = useTags('context') ?? []
-  const allTags = [...categoryTags, ...contextTags]
+  const tags = useTags() ?? []
+  // One shared order across both kinds (not category-then-context) — set
+  // by dragging in Tagghantering, so e.g. "Jobb" can sit first even though
+  // it's a category tag and "Vibe" (also category) sits last.
+  const allTags = sortTagsByOrder(tags)
 
   if (allTags.length === 0) return null
 

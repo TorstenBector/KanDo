@@ -10,6 +10,27 @@ export function useTags(kind) {
   }, [kind])
 }
 
+// Tags without a sort_order (created before manual ordering existed, or
+// brand new) sort after every explicitly-ordered tag, alphabetically among
+// themselves — never jumbled in with the ordered ones by insertion order.
+export function sortTagsByOrder(tags) {
+  return [...tags].sort((a, b) => {
+    const aHas = a.sort_order != null
+    const bHas = b.sort_order != null
+    if (aHas && bHas) return a.sort_order - b.sort_order
+    if (aHas !== bHas) return aHas ? -1 : 1
+    return a.name.localeCompare(b.name, 'sv')
+  })
+}
+
+// Same shape as reorderPrioritized (items) / reorderChildren (subtasks) —
+// drag-to-reorder in Tagghantering, driving both the chip bar everywhere
+// and Dagens Fokus's "group by tag" order.
+export async function reorderTags(orderedIds) {
+  await Promise.all(orderedIds.map((id, index) => db.tags.update(id, { sort_order: index })))
+  useSyncStore.getState().pushOnly()
+}
+
 export function useItemTags(itemId) {
   return useLiveQuery(async () => {
     if (!itemId) return []

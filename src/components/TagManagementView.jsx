@@ -1,5 +1,8 @@
 import { useMemo, useState } from 'react'
-import { useTags, useTagUsageCounts, renameTag, setTagKind, deleteTagEverywhere, mergeTags } from '../hooks/useTags'
+import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core'
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import { useTags, useTagUsageCounts, renameTag, setTagKind, deleteTagEverywhere, mergeTags, sortTagsByOrder, reorderTags } from '../hooks/useTags'
 import TagItemsModal from './TagItemsModal'
 import { theme } from '../theme'
 
@@ -15,10 +18,19 @@ export default function TagManagementView() {
   const [editValue, setEditValue] = useState('')
   const [viewingTag, setViewingTag] = useState(null)
 
-  const sortedTags = useMemo(
-    () => [...allTags].sort((a, b) => a.name.localeCompare(b.name, 'sv')),
-    [allTags]
-  )
+  const sortedTags = useMemo(() => sortTagsByOrder(allTags), [allTags])
+
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
+
+  async function handleDragEnd(event) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const oldIndex = sortedTags.findIndex((t) => t.id === active.id)
+    const newIndex = sortedTags.findIndex((t) => t.id === over.id)
+    if (oldIndex === -1 || newIndex === -1) return
+    const reordered = arrayMove(sortedTags, oldIndex, newIndex)
+    await reorderTags(reordered.map((t) => t.id))
+  }
 
   function toggleSelected(id) {
     setSelected((prev) => {
@@ -71,7 +83,8 @@ export default function TagManagementView() {
     <div style={{ padding: '1rem' }}>
       <p style={{ color: theme.colors.textMuted, fontSize: '0.9rem', margin: '0 0 1rem' }}>
         Byt namn, byt typ (🏷 tagg / 📍 sammanhang), ta bort en tagg helt, eller kryssa i flera som är samma sak
-        (t.ex. "Work" och "Jobb") och slå ihop dem till en.
+        (t.ex. "Work" och "Jobb") och slå ihop dem till en. Dra i <span style={{ letterSpacing: '-1px' }}>⠿</span> för
+        att ändra ordning — samma ordning används i tagg-chippen överallt och i Dagens Fokus grupperingsläge.
       </p>
 
       {selected.size >= 2 && (
@@ -92,79 +105,117 @@ export default function TagManagementView() {
         <p style={{ color: theme.colors.textMuted }}>Inga taggar än.</p>
       )}
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-        {sortedTags.map((tag) => {
-          const count = usageCounts.get(tag.id) ?? 0
-          const editing = editingId === tag.id
-          return (
-            <div
-              key={tag.id}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '0.6rem',
-                background: theme.colors.surface, border: `1px solid ${theme.colors.border}`,
-                borderRadius: theme.radius.sm, padding: '0.5rem 0.7rem',
-              }}
-            >
-              <input
-                type="checkbox"
-                checked={selected.has(tag.id)}
-                onChange={() => toggleSelected(tag.id)}
-                style={{ width: '1.1rem', height: '1.1rem', flexShrink: 0, cursor: 'pointer' }}
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <SortableContext items={sortedTags.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+            {sortedTags.map((tag) => (
+              <TagRow
+                key={tag.id}
+                tag={tag}
+                count={usageCounts.get(tag.id) ?? 0}
+                selected={selected.has(tag.id)}
+                onToggleSelected={() => toggleSelected(tag.id)}
+                editing={editingId === tag.id}
+                editValue={editValue}
+                onEditValueChange={setEditValue}
+                onStartEdit={() => startEdit(tag)}
+                onCommitEdit={() => commitEdit(tag.id)}
+                onToggleKind={() => setTagKind(tag.id, tag.kind === 'context' ? 'category' : 'context')}
+                onView={() => setViewingTag(tag)}
+                onDelete={() => handleDelete(tag)}
               />
-              <button
-                onClick={() => setTagKind(tag.id, tag.kind === 'context' ? 'category' : 'context')}
-                title={tag.kind === 'context' ? 'Sammanhang — klicka för att göra till vanlig tagg' : 'Vanlig tagg — klicka för att göra till sammanhang'}
-                style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '1rem', flexShrink: 0 }}
-              >
-                {tag.kind === 'context' ? '📍' : '🏷'}
-              </button>
-
-              {editing ? (
-                <input
-                  autoFocus
-                  value={editValue}
-                  onChange={(e) => setEditValue(e.target.value)}
-                  onBlur={() => commitEdit(tag.id)}
-                  onKeyDown={(e) => e.key === 'Enter' && e.target.blur()}
-                  style={{
-                    flex: 1, fontSize: '0.9rem', padding: '0.2rem 0.4rem',
-                    border: `1px solid ${theme.colors.border}`, borderRadius: theme.radius.sm,
-                  }}
-                />
-              ) : (
-                <span
-                  onClick={() => startEdit(tag)}
-                  title="Klicka för att byta namn"
-                  style={{ flex: 1, color: theme.colors.text, fontWeight: 500, cursor: 'text' }}
-                >
-                  {tag.name}
-                </span>
-              )}
-
-              <button
-                onClick={() => setViewingTag(tag)}
-                title="Visa KanDo's med den här taggen"
-                style={{
-                  border: `1px solid ${theme.colors.border}`, background: 'transparent',
-                  color: theme.colors.text, cursor: 'pointer', fontSize: '0.75rem',
-                  borderRadius: theme.radius.sm, padding: '0.2rem 0.55rem', flexShrink: 0,
-                }}
-              >
-                {count} KanDo{count === 1 ? '' : 's'}
-              </button>
-              <button
-                onClick={() => handleDelete(tag)}
-                title="Ta bort tagg"
-                style={{ border: 'none', background: 'transparent', color: theme.colors.danger, cursor: 'pointer', fontSize: '0.9rem', flexShrink: 0 }}
-              >
-                ✕
-              </button>
-            </div>
-          )
-        })}
-      </div>
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
 
       {viewingTag && <TagItemsModal tag={viewingTag} onClose={() => setViewingTag(null)} />}
+    </div>
+  )
+}
+
+function TagRow({
+  tag, count, selected, onToggleSelected, editing, editValue, onEditValueChange,
+  onStartEdit, onCommitEdit, onToggleKind, onView, onDelete,
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: tag.id })
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    display: 'flex', alignItems: 'center', gap: '0.6rem',
+    background: theme.colors.surface, border: `1px solid ${theme.colors.border}`,
+    borderRadius: theme.radius.sm, padding: '0.5rem 0.7rem',
+  }
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <div
+        {...attributes}
+        {...listeners}
+        title="Dra för att ändra ordning"
+        style={{
+          flexShrink: 0, width: '1.4rem', height: '1.4rem', display: 'flex',
+          alignItems: 'center', justifyContent: 'center', cursor: 'grab', touchAction: 'none',
+          color: theme.colors.textMuted, fontSize: '1rem', letterSpacing: '-1px',
+        }}
+      >
+        ⠿
+      </div>
+      <input
+        type="checkbox"
+        checked={selected}
+        onChange={onToggleSelected}
+        style={{ width: '1.1rem', height: '1.1rem', flexShrink: 0, cursor: 'pointer' }}
+      />
+      <button
+        onClick={onToggleKind}
+        title={tag.kind === 'context' ? 'Sammanhang — klicka för att göra till vanlig tagg' : 'Vanlig tagg — klicka för att göra till sammanhang'}
+        style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontSize: '1rem', flexShrink: 0 }}
+      >
+        {tag.kind === 'context' ? '📍' : '🏷'}
+      </button>
+
+      {editing ? (
+        <input
+          autoFocus
+          value={editValue}
+          onChange={(e) => onEditValueChange(e.target.value)}
+          onBlur={onCommitEdit}
+          onKeyDown={(e) => e.key === 'Enter' && e.target.blur()}
+          style={{
+            flex: 1, fontSize: '0.9rem', padding: '0.2rem 0.4rem',
+            border: `1px solid ${theme.colors.border}`, borderRadius: theme.radius.sm,
+          }}
+        />
+      ) : (
+        <span
+          onClick={onStartEdit}
+          title="Klicka för att byta namn"
+          style={{ flex: 1, color: theme.colors.text, fontWeight: 500, cursor: 'text' }}
+        >
+          {tag.name}
+        </span>
+      )}
+
+      <button
+        onClick={onView}
+        title="Visa KanDo's med den här taggen"
+        style={{
+          border: `1px solid ${theme.colors.border}`, background: 'transparent',
+          color: theme.colors.text, cursor: 'pointer', fontSize: '0.75rem',
+          borderRadius: theme.radius.sm, padding: '0.2rem 0.55rem', flexShrink: 0,
+        }}
+      >
+        {count} KanDo{count === 1 ? '' : 's'}
+      </button>
+      <button
+        onClick={onDelete}
+        title="Ta bort tagg"
+        style={{ border: 'none', background: 'transparent', color: theme.colors.danger, cursor: 'pointer', fontSize: '0.9rem', flexShrink: 0 }}
+      >
+        ✕
+      </button>
     </div>
   )
 }

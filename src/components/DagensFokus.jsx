@@ -1,8 +1,9 @@
 import { useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
-import { markDoneWithConfirm, reopenItem, sendToBacklog, scheduleToday, unschedule } from '../hooks/useItems'
+import { markDoneWithConfirm, reopenItem, sendToBacklog, scheduleToday, scheduleTomorrow, unschedule } from '../hooks/useItems'
 import { useChildrenByParent } from '../hooks/useRelations'
+import { sortTagsByOrder } from '../hooks/useTags'
 import { todayISO, addDaysISO, parseLocalDateISO } from '../lib/date'
 import ItemDetailModal from './ItemDetailModal'
 import { theme } from '../theme'
@@ -134,7 +135,7 @@ export default function DagensFokus({ selectedTagIds }) {
         groups.get(tag.id).items.push(item)
       }
     }
-    const sorted = [...groups.values()].sort((a, b) => a.tag.name.localeCompare(b.tag.name, 'sv'))
+    const sorted = sortTagsByOrder([...groups.values()].map((g) => g.tag)).map((tag) => groups.get(tag.id))
     if (untagged.length > 0) sorted.push({ tag: null, items: untagged })
     return sorted
   }, [groupByTag, tagsByItemId, activeItems])
@@ -456,9 +457,48 @@ function MissedCard({ item, onOpenDetail, onSwipeRight, onSwipeLeft }) {
 
 function FocusRow({ item, showScheduled, onOpenDetail, childCount = 0, collapsed = false, onToggleCollapse, isChild = false }) {
   const done = item.status === 'klar'
+  // Swipe right -> push to tomorrow, left -> back to Backlog — same
+  // pointer-drag technique as MissedCard's review swipe, just a smaller
+  // in-place nudge instead of a full-card fling, since several of these
+  // sit in a list at once rather than one at a time. Disabled once done —
+  // rescheduling/backlogging a finished item isn't a meaningful action.
+  const [dragX, setDragX] = useState(0)
+  const [dragging, setDragging] = useState(false)
+  const startXRef = useRef(0)
+  const movedRef = useRef(false)
+
+  function handlePointerDown(e) {
+    if (done) return
+    setDragging(true)
+    movedRef.current = false
+    startXRef.current = e.clientX
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+  function handlePointerMove(e) {
+    if (!dragging) return
+    const delta = e.clientX - startXRef.current
+    if (Math.abs(delta) > 4) movedRef.current = true
+    setDragX(delta)
+  }
+  function handlePointerUp() {
+    if (!dragging) return
+    setDragging(false)
+    if (dragX > SWIPE_THRESHOLD) scheduleTomorrow(item.id)
+    else if (dragX < -SWIPE_THRESHOLD) sendToBacklog(item.id)
+    setDragX(0)
+  }
+
+  const rightHintOpacity = Math.min(Math.max(dragX / SWIPE_THRESHOLD, 0), 1)
+  const leftHintOpacity = Math.min(Math.max(-dragX / SWIPE_THRESHOLD, 0), 1)
+
   return (
     <div
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={handlePointerUp}
+      onPointerCancel={handlePointerUp}
       style={{
+        position: 'relative',
         background: isChild ? theme.colors.childTint : (done ? theme.colors.surfaceGreen : theme.colors.surface),
         border: `1px solid ${isChild ? theme.colors.childTintBorder : (done ? theme.colors.success : theme.colors.border)}`,
         borderRadius: theme.radius.sm,
@@ -467,8 +507,33 @@ function FocusRow({ item, showScheduled, onOpenDetail, childCount = 0, collapsed
         display: 'flex',
         alignItems: 'center',
         gap: '0.6rem',
+        transform: dragX ? `translateX(${dragX}px)` : 'none',
+        transition: dragging ? 'none' : 'transform 0.2s ease',
+        touchAction: done ? 'auto' : 'pan-y',
       }}
     >
+      {!done && (
+        <>
+          <span
+            style={{
+              position: 'absolute', top: '50%', right: '0.6rem', transform: 'translateY(-50%)',
+              fontWeight: 700, fontSize: '0.75rem', color: theme.colors.primary,
+              opacity: rightHintOpacity, textTransform: 'uppercase', pointerEvents: 'none',
+            }}
+          >
+            Imorgon →
+          </span>
+          <span
+            style={{
+              position: 'absolute', top: '50%', left: '0.6rem', transform: 'translateY(-50%)',
+              fontWeight: 700, fontSize: '0.75rem', color: theme.colors.textMuted,
+              opacity: leftHintOpacity, textTransform: 'uppercase', pointerEvents: 'none',
+            }}
+          >
+            ← Backlog
+          </span>
+        </>
+      )}
       <button
         onClick={() => (done ? reopenItem(item.id) : markDoneWithConfirm(item.id))}
         title={done ? 'Ångra' : 'Markera som klar'}

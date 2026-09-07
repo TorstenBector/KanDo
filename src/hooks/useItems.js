@@ -140,6 +140,20 @@ export async function scheduleToday(id) {
   await updateItem(id, changes)
 }
 
+// Swipe-right in Dagens Fokus — push a card to tomorrow instead of doing
+// it today, without demoting it back through Backlog like sendToBacklog
+// does. Mirrors scheduleToday exactly, just one day later.
+export async function scheduleTomorrow(id) {
+  const item = await db.items.get(id)
+  if (!item) return
+  const changes = { scheduled_date: addDaysISO(todayISO(), 1) }
+  if (item.status !== 'planerad') {
+    changes.pre_focus_status = item.status
+    changes.status = 'planerad'
+  }
+  await updateItem(id, changes)
+}
+
 export async function unschedule(id) {
   const item = await db.items.get(id)
   if (!item) return

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useTags, useTagUsageCounts, renameTag, setTagKind, deleteTagEverywhere, mergeTags } from '../hooks/useTags'
+import TagItemsModal from './TagItemsModal'
 import { theme } from '../theme'
 
 // "Work" and "Jobb" ended up as two separate chips purely because of which
@@ -12,6 +13,7 @@ export default function TagManagementView() {
   const [selected, setSelected] = useState(() => new Set())
   const [editingId, setEditingId] = useState(null)
   const [editValue, setEditValue] = useState('')
+  const [viewingTag, setViewingTag] = useState(null)
 
   const sortedTags = useMemo(
     () => [...allTags].sort((a, b) => a.name.localeCompare(b.name, 'sv')),
@@ -139,9 +141,17 @@ export default function TagManagementView() {
                 </span>
               )}
 
-              <span style={{ fontSize: '0.75rem', color: theme.colors.textMuted, flexShrink: 0 }}>
+              <button
+                onClick={() => setViewingTag(tag)}
+                title="Visa KanDo's med den här taggen"
+                style={{
+                  border: `1px solid ${theme.colors.border}`, background: 'transparent',
+                  color: theme.colors.text, cursor: 'pointer', fontSize: '0.75rem',
+                  borderRadius: theme.radius.sm, padding: '0.2rem 0.55rem', flexShrink: 0,
+                }}
+              >
                 {count} KanDo{count === 1 ? '' : 's'}
-              </span>
+              </button>
               <button
                 onClick={() => handleDelete(tag)}
                 title="Ta bort tagg"
@@ -153,6 +163,8 @@ export default function TagManagementView() {
           )
         })}
       </div>
+
+      {viewingTag && <TagItemsModal tag={viewingTag} onClose={() => setViewingTag(null)} />}
     </div>
   )
 }

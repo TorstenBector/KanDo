@@ -18,6 +18,8 @@ const TYPE_TABS = [
   { id: 'task', label: 'Tasks' },
 ]
 
+const STATUS_LABEL = { backlog: 'Backlog', prioriterad: 'Prioriterad', planerad: 'Planerad', pagar: 'Pågår', klar: 'Klar' }
+
 const PRIORITY_OPTIONS = [
   { value: '', label: 'Ingen prio' },
   { value: 'hog', label: 'Hög' },
@@ -341,7 +343,7 @@ function BacklogItemRow({ item, onOpenDetail, childCount = 0, collapsed = false,
               <option value="project">Projekt</option>
               <option value="task">Task</option>
             </select>
-            <span style={{ fontSize: '0.7rem', color: theme.colors.textMuted }}>· {item.status}</span>
+            <span style={{ fontSize: '0.7rem', color: theme.colors.textMuted }}>· {STATUS_LABEL[item.status] ?? item.status}</span>
           </div>
           <TitleField
             itemId={item.id}

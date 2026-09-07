@@ -22,7 +22,12 @@ export async function pushPendingChanges(userId) {
   const pendingItems = await db.items.filter((i) => i._syncStatus === 'pending').toArray()
   const itemErrors = []
   for (const item of pendingItems) {
-    const { _syncStatus, ...row } = item
+    // short_id is server-assigned (Postgres identity column) — never echo
+    // a local copy of it back on write. The column tolerates an explicit
+    // value now (BY DEFAULT, not ALWAYS), but there's no reason for the
+    // client to ever send one; stripping it here is the client's half of
+    // keeping that field truly read-only from its side.
+    const { _syncStatus, short_id, ...row } = item
     const { error } = await supabase.from('items').upsert({ ...row, user_id: userId })
     if (error) {
       // Don't let one bad row block every other pending item in the batch —

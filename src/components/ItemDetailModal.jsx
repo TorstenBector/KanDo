@@ -176,6 +176,12 @@ export default function ItemDetailModal({ itemId, onClose }) {
           </div>
         )}
 
+        {item.short_id != null && (
+          <div style={{ fontSize: '0.75rem', color: theme.colors.textMuted, marginBottom: '0.3rem' }} title="Referensnummer, tilldelat vid synk — för att peka på den här KanDo'n när vi utvecklar">
+            #{item.short_id}
+          </div>
+        )}
+
         <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
           <select
             value={item.type}

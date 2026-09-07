@@ -15,8 +15,17 @@ export default function SearchView() {
   const results = useMemo(() => {
     const q = query.trim().toLowerCase()
     if (!q) return []
+    // "#142" or bare "142" matches a KanDo by its short_id, alongside the
+    // usual title/description substring search — not instead of it, since
+    // a query could coincidentally be numeric for other reasons.
+    const idQuery = q.replace(/^#/, '')
+    const idIsNumeric = /^\d+$/.test(idQuery)
     return allItems
-      .filter((i) => i.title?.toLowerCase().includes(q) || i.description?.toLowerCase().includes(q))
+      .filter((i) =>
+        i.title?.toLowerCase().includes(q) ||
+        i.description?.toLowerCase().includes(q) ||
+        (idIsNumeric && i.short_id != null && String(i.short_id).includes(idQuery))
+      )
       .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at))
   }, [allItems, query])
 
@@ -88,7 +97,7 @@ function ResultRow({ item, query, onOpen }) {
       }}
     >
       <div style={{ fontSize: '0.7rem', color: theme.colors.textMuted, textTransform: 'uppercase' }}>
-        {TYPE_LABEL[item.type]} · {STATUS_LABEL[item.status]}
+        {TYPE_LABEL[item.type]} · {STATUS_LABEL[item.status]}{item.short_id != null ? ` · #${item.short_id}` : ''}
       </div>
       <div
         style={{

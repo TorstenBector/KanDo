@@ -98,6 +98,13 @@ export async function pullRemoteChanges(userId) {
     const local = await db.items.get(remote.id)
     if (!local || new Date(remote.updated_at) > new Date(local.updated_at)) {
       await db.items.put({ ...remote, _syncStatus: 'synced' })
+    } else if (local.short_id == null && remote.short_id != null) {
+      // short_id is assigned by Postgres the moment an item first reaches
+      // the server — but that doesn't bump updated_at, so the branch above
+      // would otherwise never pull it down onto a local copy that's
+      // "already up to date" on everything else. Patch just this one
+      // server-authoritative field rather than touching anything else.
+      await db.items.update(remote.id, { short_id: remote.short_id })
     }
   }
 

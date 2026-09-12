@@ -10,3 +10,10 @@ db.version(1).stores({
   spec_versions: 'id, item_id, version_date',
   item_images: 'id, user_id, item_id, created_at, _syncStatus',
 })
+
+// Stapelvaror: a recurring shopping-list template (checked off before a
+// store run, reset after) — a separate table from `items` since these rows
+// never go through the backlog/kanban/status lifecycle.
+db.version(2).stores({
+  shopping_staples: 'id, user_id, sort_order, created_at, updated_at, _syncStatus',
+})

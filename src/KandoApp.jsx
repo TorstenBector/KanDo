@@ -16,8 +16,10 @@ import TagChipBar from './components/TagChipBar'
 import ExportPanel from './components/ExportPanel'
 import RegistrationScreen from './components/RegistrationScreen'
 import { useSyncStore } from './store/syncStore'
+import { useUiStore } from './store/uiStore'
 import { useProfile } from './hooks/useProfile'
 import { reactivateDueRecurringItems, reactivatePausedItems, migrateLegacyItemStatus } from './hooks/useItems'
+import { seedDefaultStaplesIfEmpty } from './hooks/useShoppingStaples'
 import { theme } from './theme'
 
 const TABS = [
@@ -50,6 +52,8 @@ export default function KandoApp() {
   const session = useSyncStore((s) => s.session)
   const setPassword = useSyncStore((s) => s.setPassword)
   const { profile, loading: profileLoading, saveProfile } = useProfile(session)
+  const mobileLook = useUiStore((s) => s.mobileLook)
+  const toggleMobileLook = useUiStore((s) => s.toggleMobileLook)
 
   useEffect(() => {
     // Local data repairs run before the first sync attempt, so a stale
@@ -58,6 +62,7 @@ export default function KandoApp() {
       await migrateLegacyItemStatus()
       await reactivateDueRecurringItems()
       await reactivatePausedItems()
+      await seedDefaultStaplesIfEmpty()
       initSync()
     }
     boot()
@@ -73,7 +78,30 @@ export default function KandoApp() {
   const currentTabLabel = TABS.find((t) => t.id === tab)?.label ?? ''
 
   return (
-    <div style={{ minHeight: '100vh', background: theme.colors.bg }}>
+    <div style={{ minHeight: '100vh', background: mobileLook ? theme.colors.primaryDark : theme.colors.bg }}>
+    {/* Mobillook: capping width to a phone-ish column also fixes wide grids
+        (e.g. Prio's multi-column layout) for free, since minmax(340px, 1fr)
+        naturally collapses to one column once the container itself is
+        narrower than two cards. `transform` makes this div the containing
+        block for every `position: fixed` descendant (QuickCapture's button,
+        every modal) — without it they'd stay pinned to the real viewport
+        corners instead of this frame. See MDN: fixed positioning containing
+        block is the nearest ancestor with a transform/filter/perspective. */}
+    <div
+      style={
+        mobileLook
+          ? {
+              maxWidth: '430px',
+              margin: '0 auto',
+              minHeight: '100vh',
+              position: 'relative',
+              transform: 'translateZ(0)',
+              boxShadow: theme.shadow.md,
+              background: theme.colors.bg,
+            }
+          : { minHeight: '100vh', background: theme.colors.bg }
+      }
+    >
       <header
         style={{
           position: 'sticky',
@@ -95,6 +123,23 @@ export default function KandoApp() {
           <strong style={{ fontSize: '1.1rem' }}>KanDo</strong>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <AccountPanel />
+            <button
+              onClick={toggleMobileLook}
+              aria-pressed={mobileLook}
+              title={mobileLook ? 'Växla till desktop-vy' : 'Växla till mobilvy (bra för Prio på bred skärm)'}
+              style={{
+                background: mobileLook ? theme.colors.accent : 'transparent',
+                border: `1px solid ${mobileLook ? theme.colors.accent : theme.colors.textOnPrimary}`,
+                borderRadius: theme.radius.sm,
+                color: mobileLook ? theme.colors.primaryDark : theme.colors.textOnPrimary,
+                padding: '0.3rem 0.5rem',
+                fontSize: '0.95rem',
+                lineHeight: 1,
+                cursor: 'pointer',
+              }}
+            >
+              📱
+            </button>
             <TabMenu tabs={TABS} tab={tab} setTab={setTab} />
           </div>
         </div>
@@ -155,6 +200,7 @@ export default function KandoApp() {
       </main>
 
       <QuickCapture />
+    </div>
     </div>
   )
 }

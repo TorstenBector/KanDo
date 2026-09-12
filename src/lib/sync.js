@@ -14,6 +14,11 @@ export async function claimLocalData(userId) {
   for (const tag of orphanTags) {
     await db.tags.update(tag.id, { user_id: userId })
   }
+
+  const orphanStaples = await db.shopping_staples.filter((s) => !s.user_id).toArray()
+  for (const staple of orphanStaples) {
+    await db.shopping_staples.update(staple.id, { user_id: userId, _syncStatus: 'pending' })
+  }
 }
 
 export async function pushPendingChanges(userId) {
@@ -73,6 +78,20 @@ export async function pushPendingChanges(userId) {
       continue
     }
     await db.item_images.update(image.id, { _syncStatus: 'synced' })
+  }
+
+  // Stapelvaror get the same dirty-flag treatment as items — checked/unchecked
+  // toggles happen often, and last-write-wins via updated_at handles two
+  // devices editing the template independently.
+  const pendingStaples = await db.shopping_staples.filter((s) => s._syncStatus === 'pending').toArray()
+  for (const staple of pendingStaples) {
+    const { _syncStatus, ...row } = staple
+    const { error } = await supabase.from('shopping_staples').upsert({ ...row, user_id: userId })
+    if (error) {
+      itemErrors.push(`"${staple.name}": ${error.message}`)
+      continue
+    }
+    await db.shopping_staples.update(staple.id, { _syncStatus: 'synced' })
   }
 
   // Everything that *could* sync did; report what couldn't rather than
@@ -140,6 +159,15 @@ export async function pullRemoteChanges(userId) {
       if (fullImages?.length) {
         await db.item_images.bulkPut(fullImages.map((img) => ({ ...img, _syncStatus: 'synced' })))
       }
+    }
+  }
+
+  const { data: remoteStaples, error: staplesErr } = await supabase.from('shopping_staples').select('*').eq('user_id', userId)
+  if (staplesErr) pullErrors.push(`stapelvaror: ${staplesErr.message}`)
+  for (const remote of remoteStaples ?? []) {
+    const local = await db.shopping_staples.get(remote.id)
+    if (!local || new Date(remote.updated_at) > new Date(local.updated_at)) {
+      await db.shopping_staples.put({ ...remote, _syncStatus: 'synced' })
     }
   }
 

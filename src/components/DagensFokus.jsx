@@ -342,17 +342,42 @@ const SWIPE_THRESHOLD = 90
 function MissedReview({ items, onOpenDetail, onClose }) {
   const item = items[0]
 
+  // The "all done" state used to be a muted grey line easy to mistake for
+  // "Dagens Fokus is empty" — it's the opposite: today's already-scheduled
+  // KanDo's are one click away, so this needs to read as a clear next step,
+  // not a quiet dead end.
   if (!item) {
     return (
-      <div style={{ padding: '1.5rem 0', textAlign: 'center' }}>
-        <p style={{ color: theme.colors.textMuted, margin: '0 0 0.75rem' }}>Inga fler missade — bra jobbat! 🎉</p>
-        <button onClick={onClose} style={{ ...dateNavBtn, width: 'auto', padding: '0 0.8rem' }}>Stäng genomgång</button>
+      <div
+        style={{
+          padding: '1.5rem 1rem',
+          textAlign: 'center',
+          background: theme.colors.surfaceGreen,
+          border: `1px solid ${theme.colors.success}`,
+          borderRadius: theme.radius.md,
+          boxShadow: theme.shadow.sm,
+        }}
+      >
+        <div style={{ fontSize: '2.2rem', lineHeight: 1, marginBottom: '0.5rem' }}>🎉</div>
+        <p style={{ color: theme.colors.text, fontWeight: 700, fontSize: '1.05rem', margin: '0 0 1rem' }}>
+          Alla missade är genomgångna!
+        </p>
+        <button onClick={onClose} style={ctaBtn}>Visa dagens KanDo's →</button>
       </div>
     )
   }
 
   return (
     <div style={{ padding: '1rem 0 1.5rem', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '1rem' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', maxWidth: '360px' }}>
+        <span style={{ color: theme.colors.textMuted, fontSize: '0.8rem' }}>{items.length} kvar</span>
+        {/* Skipping the rest of the review and jumping straight to today's
+            already-scheduled list — no need to swipe through every missed
+            card first. */}
+        <button onClick={onClose} title="Avbryt genomgången och gå till dagens redan schemalagda KanDo's" style={skipToTodayBtn}>
+          Hoppa till idag →
+        </button>
+      </div>
       <MissedCard
         key={item.id}
         item={item}
@@ -368,9 +393,6 @@ function MissedReview({ items, onOpenDetail, onClose }) {
           Dagens Fokus →
         </button>
       </div>
-      <button onClick={onClose} style={{ background: 'transparent', border: 'none', color: theme.colors.textMuted, fontSize: '0.8rem', cursor: 'pointer' }}>
-        ✕ Stäng genomgång
-      </button>
     </div>
   )
 }
@@ -659,6 +681,29 @@ const secondaryReviewBtn = {
   fontSize: '0.9rem',
   fontWeight: 600,
   cursor: 'pointer',
+}
+
+const skipToTodayBtn = {
+  border: `1px solid ${theme.colors.primary}`,
+  background: theme.colors.surface,
+  color: theme.colors.primary,
+  borderRadius: theme.radius.sm,
+  padding: '0.35rem 0.7rem',
+  fontSize: '0.8rem',
+  fontWeight: 700,
+  cursor: 'pointer',
+}
+
+const ctaBtn = {
+  border: 'none',
+  background: theme.colors.primary,
+  color: theme.colors.textOnPrimary,
+  borderRadius: theme.radius.sm,
+  padding: '0.7rem 1.4rem',
+  fontSize: '1rem',
+  fontWeight: 700,
+  cursor: 'pointer',
+  boxShadow: theme.shadow.sm,
 }
 
 const dateNavBtn = {

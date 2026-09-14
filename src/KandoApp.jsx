@@ -122,7 +122,7 @@ export default function KandoApp() {
             justifyContent: 'space-between',
           }}
         >
-          <strong style={{ fontSize: '1.1rem' }}>KanDo</strong>
+          <strong style={{ fontSize: '1.43rem' }}>KanDo</strong>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <AccountPanel open={accountOpen} onOpenChange={setAccountOpen} />
             <button

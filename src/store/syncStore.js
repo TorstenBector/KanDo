@@ -102,3 +102,16 @@ window.addEventListener('online', () => {
   useSyncStore.getState().sync()
 })
 window.addEventListener('offline', () => useSyncStore.getState().setOnline(false))
+
+// Data sync used to only run on cold boot, an online-event, or a manual tap
+// — resuming a backgrounded mobile PWA is none of those. main.jsx already
+// checks for a *code* update on visibilitychange (registration.update()),
+// but nothing re-ran the *data* sync, so a push kicked off right before
+// backgrounding/locking the phone (fire-and-forget from useItems.js) could
+// get cut off mid-flight and then just sit there as a permanently-pending
+// local edit until the app happened to be fully relaunched or someone
+// noticed and tapped "Synka nu" themselves. This closes that gap the same
+// way the online-event listener above already does.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') useSyncStore.getState().sync()
+})

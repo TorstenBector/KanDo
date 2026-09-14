@@ -11,6 +11,7 @@ import TagManagementView from './components/TagManagementView'
 import SearchView from './components/SearchView'
 import HelpView from './components/HelpView'
 import AccountPanel from './components/AccountPanel'
+import SyncNudgeBanner from './components/SyncNudgeBanner'
 import TabMenu from './components/TabMenu'
 import TagChipBar from './components/TagChipBar'
 import ExportPanel from './components/ExportPanel'
@@ -42,6 +43,7 @@ export default function KandoApp() {
   const [tab, setTab] = useState('fokus')
   const [selectedTagIds, setSelectedTagIds] = useState(() => new Set())
   const [exportOpen, setExportOpen] = useState(false)
+  const [accountOpen, setAccountOpen] = useState(false)
   const toggleTag = (id) =>
     setSelectedTagIds((prev) => {
       const next = new Set(prev)
@@ -122,7 +124,7 @@ export default function KandoApp() {
         >
           <strong style={{ fontSize: '1.1rem' }}>KanDo</strong>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-            <AccountPanel />
+            <AccountPanel open={accountOpen} onOpenChange={setAccountOpen} />
             <button
               onClick={toggleMobileLook}
               aria-pressed={mobileLook}
@@ -154,6 +156,8 @@ export default function KandoApp() {
           {currentTabLabel}
         </div>
       </header>
+
+      <SyncNudgeBanner onOpenAccount={() => setAccountOpen(true)} />
 
       {TAG_FILTER_TABS.has(tab) && (
         <div style={{ display: 'flex', alignItems: 'center', background: theme.colors.bg, borderBottom: `1px solid ${theme.colors.border}` }}>

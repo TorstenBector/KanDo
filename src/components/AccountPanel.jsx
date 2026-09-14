@@ -5,8 +5,13 @@ import { useSyncStore } from '../store/syncStore'
 import SetPasswordModal from './SetPasswordModal'
 import { theme } from '../theme'
 
-export default function AccountPanel() {
-  const [open, setOpen] = useState(false)
+// open/onOpenChange are optional — lets SyncNudgeBanner's "Logga in"-knapp
+// öppna den här panelen utan att duplicera inloggningsformuläret. Utan dem
+// beter sig komponenten precis som förut, med egen intern state.
+export default function AccountPanel({ open: controlledOpen, onOpenChange } = {}) {
+  const [internalOpen, setInternalOpen] = useState(false)
+  const open = controlledOpen ?? internalOpen
+  const setOpen = onOpenChange ?? setInternalOpen
   const [mode, setMode] = useState('magiclink') // 'magiclink' | 'password'
   const [email, setEmail] = useState('')
   const [password, setPasswordInput] = useState('')
@@ -63,16 +68,35 @@ export default function AccountPanel() {
     <div style={{ position: 'relative' }}>
       <button
         onClick={() => setOpen((o) => !o)}
-        style={{
-          background: 'transparent',
-          border: 'none',
-          color: theme.colors.textOnPrimary,
-          cursor: 'pointer',
-          fontSize: '0.85rem',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '0.3rem',
-        }}
+        style={
+          session
+            ? {
+                background: 'transparent',
+                border: 'none',
+                color: theme.colors.textOnPrimary,
+                cursor: 'pointer',
+                fontSize: '0.85rem',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.3rem',
+              }
+            : {
+                // Utloggat läge syns lätt bort som vanlig text i headern —
+                // det här är läget där INGET synkar alls, så det ska sticka
+                // ut, inte smälta in bredvid "✓ Synkad".
+                background: theme.colors.warning,
+                border: 'none',
+                color: theme.colors.primaryDark,
+                cursor: 'pointer',
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.3rem',
+                borderRadius: '999px',
+                padding: '0.25rem 0.6rem',
+              }
+        }
       >
         {session ? (
           <>
@@ -85,7 +109,7 @@ export default function AccountPanel() {
                   : '✓ Synkad'}
           </>
         ) : (
-          '⚠ Logga in'
+          '⚠ Ej inloggad'
         )}
       </button>
 

@@ -12,7 +12,7 @@ export async function claimLocalData(userId) {
 
   const orphanTags = await db.tags.filter((t) => !t.user_id).toArray()
   for (const tag of orphanTags) {
-    await db.tags.update(tag.id, { user_id: userId })
+    await db.tags.update(tag.id, { user_id: userId, _syncStatus: 'pending' })
   }
 
   const orphanStaples = await db.shopping_staples.filter((s) => !s.user_id).toArray()
@@ -43,12 +43,23 @@ export async function pushPendingChanges(userId) {
     await db.items.update(item.id, { _syncStatus: 'synced' })
   }
 
-  // Tags/links are cheap append-mostly data — just upsert the lot each time
-  // rather than tracking a separate dirty flag for them.
-  const localTags = await db.tags.where('user_id').equals(userId).toArray()
-  if (localTags.length > 0) {
-    const { error } = await supabase.from('tags').upsert(localTags)
-    if (error) itemErrors.push(`taggar: ${error.message}`)
+  // Tags used to be pushed as "upsert every local tag every cycle" —
+  // cheap and fine for a device that's always been synced, but a device
+  // reconnecting after a long time offline would silently overwrite
+  // renamed/reorganized/deleted tags with its own stale copies the moment
+  // it logged back in. Gated on _syncStatus like items now (see
+  // 20260914010000_tags_updated_at.sql) so a stale device's pull runs
+  // first and discards its own outdated pending edits before push ever
+  // gets a chance to send them.
+  const pendingTags = await db.tags.filter((t) => t._syncStatus === 'pending').toArray()
+  for (const tag of pendingTags) {
+    const { _syncStatus, ...row } = tag
+    const { error } = await supabase.from('tags').upsert({ ...row, user_id: userId })
+    if (error) {
+      itemErrors.push(`tagg "${tag.name}": ${error.message}`)
+      continue
+    }
+    await db.tags.update(tag.id, { _syncStatus: 'synced' })
   }
 
   const localItemIds = (await db.items.where('user_id').equals(userId).primaryKeys())
@@ -134,7 +145,15 @@ export async function pullRemoteChanges(userId) {
 
   const { data: remoteTags, error: tagsErr } = await supabase.from('tags').select('*').eq('user_id', userId)
   if (tagsErr) pullErrors.push(`taggar: ${tagsErr.message}`)
-  if (remoteTags?.length) await db.tags.bulkPut(remoteTags)
+  for (const remote of remoteTags ?? []) {
+    const local = await db.tags.get(remote.id)
+    // Missing local updated_at (tags pulled before this field existed)
+    // treated as "always older" — remote wins, same safe default as a
+    // brand-new local row.
+    if (!local || new Date(remote.updated_at) > new Date(local.updated_at ?? 0)) {
+      await db.tags.put({ ...remote, _syncStatus: 'synced' })
+    }
+  }
 
   // RLS scopes this to the caller's own items automatically.
   const { data: remoteLinks, error: linksErr } = await supabase.from('item_tags').select('item_id, tag_id')

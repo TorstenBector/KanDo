@@ -104,6 +104,25 @@ export default function AccountPanel() {
             zIndex: 200,
           }}
         >
+          <button
+            onClick={() => setOpen(false)}
+            title="Stäng"
+            aria-label="Stäng"
+            style={{
+              position: 'absolute',
+              top: '0.4rem',
+              right: '0.5rem',
+              border: 'none',
+              background: 'transparent',
+              color: theme.colors.textMuted,
+              fontSize: '1.1rem',
+              lineHeight: 1,
+              cursor: 'pointer',
+              padding: '0.2rem',
+            }}
+          >
+            ✕
+          </button>
           {session ? (
             <>
               <p style={{ color: theme.colors.text, fontSize: '0.85rem', margin: '0 0 0.5rem', wordBreak: 'break-all' }}>

@@ -27,7 +27,10 @@ export function sortTagsByOrder(tags) {
 // drag-to-reorder in Tagghantering, driving both the chip bar everywhere
 // and Dagens Fokus's "group by tag" order.
 export async function reorderTags(orderedIds) {
-  await Promise.all(orderedIds.map((id, index) => db.tags.update(id, { sort_order: index })))
+  const now = new Date().toISOString()
+  await Promise.all(orderedIds.map((id, index) =>
+    db.tags.update(id, { sort_order: index, updated_at: now, _syncStatus: 'pending' })
+  ))
   useSyncStore.getState().pushOnly()
 }
 
@@ -64,12 +67,15 @@ export async function findOrCreateTag(name, kind = 'category') {
     .first()
   if (existing) return existing
   const userId = useSyncStore.getState().session?.user?.id ?? null
+  const now = new Date().toISOString()
   const tag = {
     id: crypto.randomUUID(),
     user_id: userId,
     name: trimmed,
     kind,
-    created_at: new Date().toISOString(),
+    created_at: now,
+    updated_at: now,
+    _syncStatus: 'pending',
   }
   await db.tags.add(tag)
   useSyncStore.getState().pushOnly()
@@ -79,12 +85,12 @@ export async function findOrCreateTag(name, kind = 'category') {
 export async function renameTag(tagId, newName) {
   const trimmed = newName.trim()
   if (!trimmed) return
-  await db.tags.update(tagId, { name: trimmed })
+  await db.tags.update(tagId, { name: trimmed, updated_at: new Date().toISOString(), _syncStatus: 'pending' })
   useSyncStore.getState().pushOnly()
 }
 
 export async function setTagKind(tagId, kind) {
-  await db.tags.update(tagId, { kind })
+  await db.tags.update(tagId, { kind, updated_at: new Date().toISOString(), _syncStatus: 'pending' })
   useSyncStore.getState().pushOnly()
 }
 

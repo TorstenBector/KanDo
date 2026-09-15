@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core'
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
@@ -66,6 +66,21 @@ export default function ItemDetailModal({ itemId, onClose }) {
   const [titleDraft, setTitleDraft] = useEditBuffer(itemId, item?.title)
   const [descriptionDraft, setDescriptionDraft] = useEditBuffer(itemId, item ? (item.description ?? '') : undefined)
 
+  // A local Dexie lookup resolves in a handful of ms — there's no real
+  // "still loading" window worth showing a spinner for. So if `item` is
+  // still undefined a beat after opening, that's not a slow query, it's a
+  // card whose id isn't in the local db at all (stale reference, a sync
+  // gap, a deleted item). Silently returning null for that (old behavior)
+  // is indistinguishable from the click doing nothing — reported as
+  // "can't open cards" from Dagens Fokus/Backlog. Surface it instead.
+  const [notFoundAfterGrace, setNotFoundAfterGrace] = useState(false)
+  useEffect(() => {
+    setNotFoundAfterGrace(false)
+    if (!itemId) return undefined
+    const t = setTimeout(() => setNotFoundAfterGrace(true), 500)
+    return () => clearTimeout(t)
+  }, [itemId])
+
   async function handleImageSelect(e) {
     const file = e.target.files?.[0]
     e.target.value = '' // allow picking the same file again
@@ -78,7 +93,39 @@ export default function ItemDetailModal({ itemId, onClose }) {
     }
   }
 
-  if (!itemId || !item) return null
+  if (!itemId) return null
+
+  if (!item) {
+    // Within the grace window this is almost certainly still resolving —
+    // render nothing rather than flash an error for a normal fast lookup.
+    if (!notFoundAfterGrace) return null
+    return (
+      <div
+        onClick={onClose}
+        style={{
+          position: 'fixed', inset: 0, background: 'rgba(26,58,26,0.45)',
+          display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 300,
+        }}
+      >
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            background: theme.colors.bg,
+            borderRadius: `${theme.radius.lg} ${theme.radius.lg} 0 0`,
+            padding: '1rem', width: '100%', maxWidth: '520px', boxShadow: theme.shadow.md, boxSizing: 'border-box',
+          }}
+        >
+          <div style={{ fontWeight: 600, color: theme.colors.danger, marginBottom: '0.4rem' }}>
+            Kunde inte hitta det här kortet
+          </div>
+          <p style={{ fontSize: '0.85rem', color: theme.colors.textMuted, marginBottom: '0.75rem' }}>
+            Det finns inte i den lokala datan just nu — kan bero på att det tagits bort på en annan enhet, eller att synken inte hunnit ikapp. Prova synka (⟳-ikonen) eller ladda om appen.
+          </p>
+          <button onClick={onClose} style={primaryBtn}>Stäng</button>
+        </div>
+      </div>
+    )
+  }
 
   async function handleChildDragEnd(event) {
     const { active, over } = event

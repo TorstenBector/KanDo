@@ -88,14 +88,23 @@ export default function KandoApp() {
         block for every `position: fixed` descendant (QuickCapture's button,
         every modal) — without it they'd stay pinned to the real viewport
         corners instead of this frame. See MDN: fixed positioning containing
-        block is the nearest ancestor with a transform/filter/perspective. */}
+        block is the nearest ancestor with a transform/filter/perspective.
+        That containing block has to be a fixed `height` with its OWN scroll
+        (not `minHeight` letting it grow with content) — otherwise "fixed"
+        is measured from the bottom of the whole (tall) page instead of the
+        visible screen, so QuickCapture's + button/modals end up scrolled
+        far below the fold on any list longer than one screen (KanDo Vibe
+        #1886 — "Flytande plus"). Fixed height + overflowY:auto makes this
+        div itself the scrolling viewport, so "fixed" behaves like it does
+        in normal (non-mobileLook) mode: always glued to this frame's edge. */}
     <div
       style={
         mobileLook
           ? {
               maxWidth: '430px',
               margin: '0 auto',
-              minHeight: '100vh',
+              height: '100vh',
+              overflowY: 'auto',
               position: 'relative',
               transform: 'translateZ(0)',
               boxShadow: theme.shadow.md,

@@ -43,6 +43,43 @@ export function useItemTags(itemId) {
   }, [itemId])
 }
 
+// Given the tag ids already applied to the item being edited, finds other
+// tags that have shown up TOGETHER with any of them on at least one other
+// item, ranked by how often — e.g. once a couple of items carry both
+// "Vibe" + "TidKoll" and others carry "Vibe" + "KanDo", picking "Vibe" on a
+// new item surfaces TidKoll/KanDo as one-click suggestions. Used to guide
+// consistent double-tagging (project tag + "Vibe") across several apps
+// sharing one KanDo instance, instead of relying on remembering the
+// convention every time.
+export function useCoOccurringTags(appliedTagIds) {
+  const key = appliedTagIds && appliedTagIds.size > 0 ? [...appliedTagIds].sort().join(',') : ''
+  return useLiveQuery(async () => {
+    if (!key) return []
+    const selected = new Set(key.split(','))
+    const links = await db.item_tags.toArray()
+    const tagIdsByItem = new Map()
+    for (const link of links) {
+      if (!tagIdsByItem.has(link.item_id)) tagIdsByItem.set(link.item_id, new Set())
+      tagIdsByItem.get(link.item_id).add(link.tag_id)
+    }
+    const counts = new Map()
+    for (const itemTagIds of tagIdsByItem.values()) {
+      if (![...selected].some((id) => itemTagIds.has(id))) continue
+      for (const tagId of itemTagIds) {
+        if (selected.has(tagId)) continue
+        counts.set(tagId, (counts.get(tagId) ?? 0) + 1)
+      }
+    }
+    if (counts.size === 0) return []
+    const tagIds = [...counts.keys()]
+    const tags = await db.tags.bulkGet(tagIds)
+    return tags
+      .map((tag, i) => (tag ? { tag, count: counts.get(tagIds[i]) } : null))
+      .filter(Boolean)
+      .sort((a, b) => b.count - a.count)
+  }, [key]) ?? []
+}
+
 // How many items currently carry this tag — shown in Tagghantering so a
 // merge/delete decision isn't made blind.
 export function useTagUsageCounts() {

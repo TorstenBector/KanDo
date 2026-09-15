@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { db } from '../lib/db'
 import { createItem, scheduleToday, togglePrioritized, toggleShoppingList } from '../hooks/useItems'
 import TagInput from './TagInput'
+import TagCoOccurrenceSuggestions from './TagCoOccurrenceSuggestions'
 import { theme } from '../theme'
 
 // The title used to just get cut at 80 chars with "…" — the rest of a long
@@ -181,6 +182,13 @@ export default function QuickCapture() {
                   excludeIds={new Set(pendingTags.map((t) => t.id))}
                 />
               </div>
+            </div>
+
+            <div style={{ marginTop: '0.3rem' }}>
+              <TagCoOccurrenceSuggestions
+                appliedTagIds={new Set(pendingTags.map((t) => t.id))}
+                onAdd={(tag) => setPendingTags((tags) => (tags.some((t) => t.id === tag.id) ? tags : [...tags, tag]))}
+              />
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.75rem' }}>

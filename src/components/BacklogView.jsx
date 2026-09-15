@@ -7,6 +7,7 @@ import { useChildrenByParent } from '../hooks/useRelations'
 import { useEditBuffer } from '../hooks/useEditBuffer'
 import ItemDetailModal from './ItemDetailModal'
 import TagInput from './TagInput'
+import TagCoOccurrenceSuggestions from './TagCoOccurrenceSuggestions'
 import TriageReview from './TriageReview'
 import { todayISO } from '../lib/date'
 import { theme } from '../theme'
@@ -446,6 +447,12 @@ function BacklogItemRow({ item, onOpenDetail, childCount = 0, collapsed = false,
         <TagInput
           onAdd={(tag) => db.item_tags.put({ item_id: item.id, tag_id: tag.id })}
           excludeIds={new Set(tags.map((t) => t.id))}
+        />
+      </div>
+      <div style={{ marginTop: '0.25rem' }}>
+        <TagCoOccurrenceSuggestions
+          appliedTagIds={new Set(tags.map((t) => t.id))}
+          onAdd={(tag) => db.item_tags.put({ item_id: item.id, tag_id: tag.id })}
         />
       </div>
 

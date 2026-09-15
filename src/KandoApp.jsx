@@ -19,6 +19,7 @@ import RegistrationScreen from './components/RegistrationScreen'
 import { useSyncStore } from './store/syncStore'
 import { useUiStore } from './store/uiStore'
 import { useProfile } from './hooks/useProfile'
+import { useIsNarrowViewport } from './hooks/useIsNarrowViewport'
 import { reactivateDueRecurringItems, reactivatePausedItems, migrateLegacyItemStatus } from './hooks/useItems'
 import { seedDefaultStaplesIfEmpty } from './hooks/useShoppingStaples'
 import { theme } from './theme'
@@ -54,8 +55,16 @@ export default function KandoApp() {
   const session = useSyncStore((s) => s.session)
   const setPassword = useSyncStore((s) => s.setPassword)
   const { profile, loading: profileLoading, saveProfile } = useProfile(session)
-  const mobileLook = useUiStore((s) => s.mobileLook)
+  const storedMobileLook = useUiStore((s) => s.mobileLook)
   const toggleMobileLook = useUiStore((s) => s.toggleMobileLook)
+  // Mobillook exists to preview the phone layout from a DESKTOP browser —
+  // on an actual phone it just nests its own simulated 430px frame inside
+  // an already-narrower real viewport, which does nothing useful and was
+  // reported as buggy (KanDo Vibe #2078). Ignore the stored preference (and
+  // hide the toggle below) whenever the real viewport is already phone-sized,
+  // regardless of what got left on from a previous desktop session.
+  const isNarrowViewport = useIsNarrowViewport()
+  const mobileLook = storedMobileLook && !isNarrowViewport
 
   useEffect(() => {
     // Local data repairs run before the first sync attempt, so a stale
@@ -134,23 +143,25 @@ export default function KandoApp() {
           <strong style={{ fontSize: '1.43rem' }}>KanDo</strong>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
             <AccountPanel open={accountOpen} onOpenChange={setAccountOpen} />
-            <button
-              onClick={toggleMobileLook}
-              aria-pressed={mobileLook}
-              title={mobileLook ? 'Växla till desktop-vy' : 'Växla till mobilvy (bra för Prio på bred skärm)'}
-              style={{
-                background: mobileLook ? theme.colors.accent : 'transparent',
-                border: `1px solid ${mobileLook ? theme.colors.accent : theme.colors.textOnPrimary}`,
-                borderRadius: theme.radius.sm,
-                color: mobileLook ? theme.colors.primaryDark : theme.colors.textOnPrimary,
-                padding: '0.3rem 0.5rem',
-                fontSize: '0.95rem',
-                lineHeight: 1,
-                cursor: 'pointer',
-              }}
-            >
-              📱
-            </button>
+            {!isNarrowViewport && (
+              <button
+                onClick={toggleMobileLook}
+                aria-pressed={mobileLook}
+                title={mobileLook ? 'Växla till desktop-vy' : 'Växla till mobilvy (bra för Prio på bred skärm)'}
+                style={{
+                  background: mobileLook ? theme.colors.accent : 'transparent',
+                  border: `1px solid ${mobileLook ? theme.colors.accent : theme.colors.textOnPrimary}`,
+                  borderRadius: theme.radius.sm,
+                  color: mobileLook ? theme.colors.primaryDark : theme.colors.textOnPrimary,
+                  padding: '0.3rem 0.5rem',
+                  fontSize: '0.95rem',
+                  lineHeight: 1,
+                  cursor: 'pointer',
+                }}
+              >
+                📱
+              </button>
+            )}
             <TabMenu tabs={TABS} tab={tab} setTab={setTab} />
           </div>
         </div>

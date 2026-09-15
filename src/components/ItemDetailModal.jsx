@@ -59,6 +59,7 @@ export default function ItemDetailModal({ itemId, onClose }) {
   const [customRecurrence, setCustomRecurrence] = useState(false)
   const [showWeekdays, setShowWeekdays] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [lightboxImage, setLightboxImage] = useState(null)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
   // Buffered locally, re-synced only when switching to a different item —
   // binding straight to item.title/description let the async Dexie
@@ -187,6 +188,7 @@ export default function ItemDetailModal({ itemId, onClose }) {
   }
 
   return (
+    <>
     <div
       onClick={onClose}
       style={{
@@ -259,7 +261,11 @@ export default function ItemDetailModal({ itemId, onClose }) {
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
           {images.map((img) => (
             <div key={img.id} style={{ position: 'relative' }}>
-              <a href={img.data_url} target="_blank" rel="noreferrer">
+              <button
+                type="button"
+                onClick={() => setLightboxImage(img.data_url)}
+                style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', display: 'block' }}
+              >
                 <img
                   src={img.data_url}
                   alt=""
@@ -268,7 +274,7 @@ export default function ItemDetailModal({ itemId, onClose }) {
                     borderRadius: theme.radius.sm, border: `1px solid ${theme.colors.border}`, display: 'block',
                   }}
                 />
-              </a>
+              </button>
               <button
                 onClick={() => removeImage(img.id)}
                 title="Ta bort bild"
@@ -468,6 +474,40 @@ export default function ItemDetailModal({ itemId, onClose }) {
         </div>
       </div>
     </div>
+
+    {lightboxImage && (
+      // Bilder sparas som data:-URL:er (base64) — att öppna dem via en vanlig
+      // <a href target="_blank"> blockeras tyst av flera mobilwebbläsare
+      // (t.ex. iOS Safari, sedan några år tillbaka, av phishing-skäl), så
+      // klicket gjorde ingenting. Visar bilden i egen overlay i appen istället.
+      <div
+        onClick={() => setLightboxImage(null)}
+        style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 400, padding: '1rem', cursor: 'zoom-out',
+        }}
+      >
+        <img
+          src={lightboxImage}
+          alt=""
+          style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: theme.radius.sm }}
+        />
+        <button
+          onClick={() => setLightboxImage(null)}
+          title="Stäng"
+          style={{
+            position: 'fixed', top: '1rem', right: '1rem',
+            width: '2.2rem', height: '2.2rem', borderRadius: '50%',
+            border: 'none', background: 'rgba(255,255,255,0.15)', color: '#fff',
+            fontSize: '1.1rem', cursor: 'pointer', lineHeight: 1,
+          }}
+        >
+          ✕
+        </button>
+      </div>
+    )}
+    </>
   )
 }
 

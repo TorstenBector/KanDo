@@ -17,3 +17,8 @@ db.version(1).stores({
 db.version(2).stores({
   shopping_staples: 'id, user_id, sort_order, created_at, updated_at, _syncStatus',
 })
+
+// Two-level tag hierarchy (see supabase/migrations/20260917000000_tag_hierarchy.sql)
+db.version(3).stores({
+  tags: 'id, user_id, kind, name, parent_tag_id',
+})

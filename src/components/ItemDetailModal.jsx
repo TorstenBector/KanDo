@@ -9,7 +9,7 @@ import {
   addChildItem, removeChildRelation, reorderChildren, markDoneWithConfirm,
   pauseItem, resumeItem, toggleShoppingList,
 } from '../hooks/useItems'
-import { useItemTags } from '../hooks/useTags'
+import { useItemTags, addItemTag } from '../hooks/useTags'
 import { useChildren, useParent } from '../hooks/useRelations'
 import { useItemImages, addImage, removeImage } from '../hooks/useImages'
 import { useEditBuffer } from '../hooks/useEditBuffer'
@@ -421,14 +421,14 @@ export default function ItemDetailModal({ itemId, onClose }) {
             </span>
           ))}
           <TagInput
-            onAdd={(tag) => db.item_tags.put({ item_id: item.id, tag_id: tag.id })}
+            onAdd={(tag) => addItemTag(item.id, tag.id)}
             excludeIds={new Set((tags ?? []).map((t) => t.id))}
           />
         </div>
         <div style={{ marginBottom: '0.75rem', marginTop: '-0.4rem' }}>
           <TagCoOccurrenceSuggestions
             appliedTagIds={new Set((tags ?? []).map((t) => t.id))}
-            onAdd={(tag) => db.item_tags.put({ item_id: item.id, tag_id: tag.id })}
+            onAdd={(tag) => addItemTag(item.id, tag.id)}
           />
         </div>
 

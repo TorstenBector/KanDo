@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
 import { updateItem, deleteItem, markDoneWithConfirm, scheduleToday, unschedule, setRecurrence, togglePrioritized, resumeItem, toggleShoppingList } from '../hooks/useItems'
-import { useItemTags } from '../hooks/useTags'
+import { useItemTags, addItemTag } from '../hooks/useTags'
 import { useChildrenByParent } from '../hooks/useRelations'
 import { useEditBuffer } from '../hooks/useEditBuffer'
 import ItemDetailModal from './ItemDetailModal'
@@ -445,14 +445,14 @@ function BacklogItemRow({ item, onOpenDetail, childCount = 0, collapsed = false,
           </span>
         ))}
         <TagInput
-          onAdd={(tag) => db.item_tags.put({ item_id: item.id, tag_id: tag.id })}
+          onAdd={(tag) => addItemTag(item.id, tag.id)}
           excludeIds={new Set(tags.map((t) => t.id))}
         />
       </div>
       <div style={{ marginTop: '0.25rem' }}>
         <TagCoOccurrenceSuggestions
           appliedTagIds={new Set(tags.map((t) => t.id))}
-          onAdd={(tag) => db.item_tags.put({ item_id: item.id, tag_id: tag.id })}
+          onAdd={(tag) => addItemTag(item.id, tag.id)}
         />
       </div>
 

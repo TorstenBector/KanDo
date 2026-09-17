@@ -34,6 +34,60 @@ export async function reorderTags(orderedIds) {
   useSyncStore.getState().pushOnly()
 }
 
+// Adds a tag to an item, cascading up to the parent tag if it has one —
+// e.g. tagging something "Inne" also tags it "Hus", so selecting the
+// top-level "Hus" filter finds it without the filter logic needing to know
+// about the tag tree at all (see TagChipBar). Two levels only (enforced by
+// setTagParent below), so this never needs to cascade more than once.
+// Every "add a tag to an item" call site (TagInput's onAdd in
+// ItemDetailModal/BacklogView, QuickCapture's save loop, the
+// co-occurrence-suggestion chips) should go through this instead of a bare
+// db.item_tags.put, or a child tag stops reliably implying its parent.
+export async function addItemTag(itemId, tagId) {
+  await db.item_tags.put({ item_id: itemId, tag_id: tagId })
+  const tag = await db.tags.get(tagId)
+  if (tag?.parent_tag_id) {
+    await db.item_tags.put({ item_id: itemId, tag_id: tag.parent_tag_id })
+  }
+  useSyncStore.getState().pushOnly()
+}
+
+// Sets (or clears, with parentTagId=null) which tag a tag belongs under.
+// Kept to two flat levels: refuses if `tagId` already has children of its
+// own (would make it both a parent and a child) or if `parentTagId` itself
+// already has a parent (would make a grandchild). Returns null on success,
+// or a user-facing Swedish error string to show instead of applying anything.
+//
+// Setting a parent backfills every item currently tagged `tagId` with the
+// parent tag too, so existing KanDo's already filed under e.g. "Inne" show
+// up under "Hus" immediately — not just ones tagged after the fact.
+export async function setTagParent(tagId, parentTagId) {
+  if (tagId === parentTagId) return 'En tagg kan inte vara sin egen förälder.'
+
+  if (parentTagId) {
+    const [ownChildren, parentTag] = await Promise.all([
+      db.tags.where('parent_tag_id').equals(tagId).count(),
+      db.tags.get(parentTagId),
+    ])
+    if (ownChildren > 0) return 'Den här taggen har redan egna undertaggar — bara två nivåer stöds.'
+    if (parentTag?.parent_tag_id) return `"${parentTag.name}" har själv en förälder — bara två nivåer stöds.`
+  }
+
+  await db.tags.update(tagId, {
+    parent_tag_id: parentTagId ?? null,
+    updated_at: new Date().toISOString(),
+    _syncStatus: 'pending',
+  })
+
+  if (parentTagId) {
+    const links = await db.item_tags.where('tag_id').equals(tagId).toArray()
+    await Promise.all(links.map((l) => db.item_tags.put({ item_id: l.item_id, tag_id: parentTagId })))
+  }
+
+  useSyncStore.getState().pushOnly()
+  return null
+}
+
 export function useItemTags(itemId) {
   return useLiveQuery(async () => {
     if (!itemId) return []
@@ -135,6 +189,14 @@ export async function setTagKind(tagId, kind) {
 // it just loses that tag) — used from Tagghantering with an explicit
 // confirmation showing how many items are affected.
 export async function deleteTagEverywhere(tagId) {
+  // Un-parent any children locally too — Postgres does this itself
+  // (parent_tag_id references tags on delete set null) but only remotely;
+  // without this, a child tag would still dangle-reference the just-
+  // deleted parent until the next pull sync happened to correct it.
+  const orphanedChildren = await db.tags.where('parent_tag_id').equals(tagId).toArray()
+  await Promise.all(orphanedChildren.map((c) =>
+    db.tags.update(c.id, { parent_tag_id: null, updated_at: new Date().toISOString(), _syncStatus: 'pending' })
+  ))
   await db.item_tags.where('tag_id').equals(tagId).delete()
   await db.tags.delete(tagId)
   const session = useSyncStore.getState().session

@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { db } from '../lib/db'
 import { createItem, scheduleToday, togglePrioritized, toggleShoppingList } from '../hooks/useItems'
+import { addItemTag } from '../hooks/useTags'
 import TagInput from './TagInput'
 import TagCoOccurrenceSuggestions from './TagCoOccurrenceSuggestions'
 import { theme } from '../theme'
@@ -62,7 +62,7 @@ export default function QuickCapture() {
     if (scheduledToday) await scheduleToday(item.id)
     if (shoppingList) await toggleShoppingList(item.id)
     for (const tag of pendingTags) {
-      await db.item_tags.put({ item_id: item.id, tag_id: tag.id })
+      await addItemTag(item.id, tag.id)
     }
     setSaving(false)
     reset()

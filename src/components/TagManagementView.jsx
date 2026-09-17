@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { DndContext, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core'
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { useTags, useTagUsageCounts, renameTag, setTagKind, deleteTagEverywhere, mergeTags, sortTagsByOrder, reorderTags } from '../hooks/useTags'
+import { useTags, useTagUsageCounts, renameTag, setTagKind, deleteTagEverywhere, mergeTags, sortTagsByOrder, reorderTags, setTagParent } from '../hooks/useTags'
 import TagItemsModal from './TagItemsModal'
 import { theme } from '../theme'
 
@@ -19,6 +19,17 @@ export default function TagManagementView() {
   const [viewingTag, setViewingTag] = useState(null)
 
   const sortedTags = useMemo(() => sortTagsByOrder(allTags), [allTags])
+  // Two-level tree: a tag with children can't itself become a child (and
+  // vice versa) — see setTagParent. Precomputed once here so each row can
+  // just look itself up instead of re-scanning allTags per row.
+  const childCounts = useMemo(() => {
+    const counts = new Map()
+    for (const t of allTags) {
+      if (t.parent_tag_id) counts.set(t.parent_tag_id, (counts.get(t.parent_tag_id) ?? 0) + 1)
+    }
+    return counts
+  }, [allTags])
+  const parentCandidates = useMemo(() => sortedTags.filter((t) => !t.parent_tag_id), [sortedTags])
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
 
@@ -60,6 +71,11 @@ export default function TagManagementView() {
     await deleteTagEverywhere(tag.id)
   }
 
+  async function handleSetParent(tagId, parentTagId) {
+    const error = await setTagParent(tagId, parentTagId || null)
+    if (error) window.alert(error)
+  }
+
   async function handleMerge() {
     const ids = [...selected]
     if (ids.length < 2) return
@@ -85,6 +101,13 @@ export default function TagManagementView() {
         Byt namn, byt typ (🏷 tagg / 📍 sammanhang), ta bort en tagg helt, eller kryssa i flera som är samma sak
         (t.ex. "Work" och "Jobb") och slå ihop dem till en. Dra i <span style={{ letterSpacing: '-1px' }}>⠿</span> för
         att ändra ordning — samma ordning används i tagg-chippen överallt och i Dagens Fokus grupperingsläge.
+      </p>
+      <p style={{ color: theme.colors.textMuted, fontSize: '0.9rem', margin: '0 0 1rem' }}>
+        Varje tagg kan höra till en huvudkategori (t.ex. "Inne"/"Ute"/"Städ" under "Hus") — välj i rullistan på
+        raden. Bara toppnivån visas i filtret överallt annars i appen; väljer du en huvudkategori där dyker dess
+        undertaggar upp för att förfina vidare. Att sätta en förälder flyttar automatiskt alla KanDo's som redan
+        har undertaggen med — inget att göra manuellt. Bara två nivåer: en tagg med egna undertaggar kan inte
+        själv höra till något.
       </p>
 
       {selected.size >= 2 && (
@@ -113,6 +136,8 @@ export default function TagManagementView() {
                 key={tag.id}
                 tag={tag}
                 count={usageCounts.get(tag.id) ?? 0}
+                childCount={childCounts.get(tag.id) ?? 0}
+                parentCandidates={parentCandidates}
                 selected={selected.has(tag.id)}
                 onToggleSelected={() => toggleSelected(tag.id)}
                 editing={editingId === tag.id}
@@ -121,6 +146,7 @@ export default function TagManagementView() {
                 onStartEdit={() => startEdit(tag)}
                 onCommitEdit={() => commitEdit(tag.id)}
                 onToggleKind={() => setTagKind(tag.id, tag.kind === 'context' ? 'category' : 'context')}
+                onSetParent={(parentTagId) => handleSetParent(tag.id, parentTagId)}
                 onView={() => setViewingTag(tag)}
                 onDelete={() => handleDelete(tag)}
               />
@@ -135,18 +161,19 @@ export default function TagManagementView() {
 }
 
 function TagRow({
-  tag, count, selected, onToggleSelected, editing, editValue, onEditValueChange,
-  onStartEdit, onCommitEdit, onToggleKind, onView, onDelete,
+  tag, count, childCount, parentCandidates, selected, onToggleSelected, editing, editValue, onEditValueChange,
+  onStartEdit, onCommitEdit, onToggleKind, onSetParent, onView, onDelete,
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: tag.id })
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.5 : 1,
-    display: 'flex', alignItems: 'center', gap: '0.6rem',
+    display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap',
     background: theme.colors.surface, border: `1px solid ${theme.colors.border}`,
     borderRadius: theme.radius.sm, padding: '0.5rem 0.7rem',
   }
+  const canHaveParent = childCount === 0
 
   return (
     <div ref={setNodeRef} style={style}>
@@ -195,6 +222,31 @@ function TagRow({
           style={{ flex: 1, color: theme.colors.text, fontWeight: 500, cursor: 'text' }}
         >
           {tag.name}
+        </span>
+      )}
+
+      {canHaveParent ? (
+        <select
+          value={tag.parent_tag_id ?? ''}
+          onChange={(e) => onSetParent(e.target.value || null)}
+          title="Vilken huvudkategori den här taggen hör till — väljer du en flyttas alla KanDo's som redan har den här taggen automatiskt under den också"
+          style={{
+            fontSize: '0.75rem', padding: '0.2rem 0.4rem', borderRadius: theme.radius.sm,
+            border: `1px solid ${theme.colors.border}`, background: theme.colors.bg,
+            color: theme.colors.text, flexShrink: 0, maxWidth: '9rem',
+          }}
+        >
+          <option value="">— Toppnivå —</option>
+          {parentCandidates.filter((c) => c.id !== tag.id).map((c) => (
+            <option key={c.id} value={c.id}>Hör till: {c.name}</option>
+          ))}
+        </select>
+      ) : (
+        <span
+          title="Har egna undertaggar — kan inte själv höra till en annan tagg (bara två nivåer stöds)"
+          style={{ fontSize: '0.72rem', color: theme.colors.textMuted, flexShrink: 0 }}
+        >
+          Huvudkategori ({childCount})
         </span>
       )}
 

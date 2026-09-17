@@ -200,7 +200,20 @@ export default function DagensFokus({ selectedTagIds }) {
       </div>
 
       {reviewMode ? (
-        <MissedReview items={missedItems} onOpenDetail={setDetailItemId} onClose={() => setReviewMode(false)} />
+        <MissedReview
+          items={missedItems}
+          onOpenDetail={setDetailItemId}
+          onClose={() => {
+            // Both exits from review mode ("Hoppa till idag" mid-review,
+            // "Visa dagens KanDo's" once finished) promise today's list —
+            // but only reviewMode was reset, leaving selectedDate wherever
+            // it happened to be if the user had browsed to another day
+            // first. Landed on that stale (often empty) day instead of
+            // today (KanDo Vibe #2138).
+            setReviewMode(false)
+            setSelectedDate(todayISO())
+          }}
+        />
       ) : (
         <>
       {isToday && !showScheduled && (

@@ -6,6 +6,15 @@ html, body, #root {
   margin: 0;
   padding: 0;
   min-height: 100%;
+  /* Nothing here should ever be wider than the viewport, but if some
+     element briefly is (a swipe transform mid-gesture, a row that doesn't
+     wrap quite in time), mobile browsers let a touch drag pan the whole
+     PAGE horizontally instead of just clipping it — and once panned, it
+     stays shifted with the rest of the app off-screen to one side until
+     manually scrolled back (KanDo Vibe #2138 — "Missade hamnade halvvägs
+     utanför skärmen"). Any real internal horizontal scrolling (TagChipBar's
+     chip row) has its own overflowX:auto container, unaffected by this. */
+  overflow-x: hidden;
 }
 
 body {

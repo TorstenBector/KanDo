@@ -11,6 +11,17 @@ import { theme } from '../theme'
 const TYPE_LABEL = { idea: 'Idé', project: 'Projekt', task: 'Task' }
 const COLLAPSE_THRESHOLD = 3
 const PRIORITY_WEIGHT = { hog: 0, medel: 1, lag: 2 }
+// Per enhet (localStorage), inte synkat via Supabase — KanDo Vibe #4318
+// bad om att appen kommer ihåg senaste "Gruppera efter tagg"-läget istället
+// för att alltid starta om från av.
+const GROUP_BY_TAG_STORAGE_KEY = 'kando-dagensfokus-groupByTag'
+function loadGroupByTagDefault() {
+  try {
+    return localStorage.getItem(GROUP_BY_TAG_STORAGE_KEY) === 'true'
+  } catch {
+    return false
+  }
+}
 
 function formatDateLabel(iso) {
   const d = parseLocalDateISO(iso)
@@ -32,8 +43,14 @@ export default function DagensFokus({ selectedTagIds }) {
   const [showDone, setShowDone] = useState(false)
   const [detailItemId, setDetailItemId] = useState(null)
   const [selectedDate, setSelectedDate] = useState(todayISO())
-  const [groupByTag, setGroupByTag] = useState(false)
+  const [groupByTag, setGroupByTag] = useState(loadGroupByTagDefault)
   const [reviewMode, setReviewMode] = useState(false)
+  const toggleGroupByTag = () =>
+    setGroupByTag((g) => {
+      const next = !g
+      try { localStorage.setItem(GROUP_BY_TAG_STORAGE_KEY, String(next)) } catch { /* private mode etc — just don't persist */ }
+      return next
+    })
   // Parents with many children take up a lot of space, so they start
   // collapsed — expanding is an opt-in per parent.
   const [expandedParents, setExpandedParents] = useState(() => new Set())
@@ -155,48 +172,57 @@ export default function DagensFokus({ selectedTagIds }) {
 
   return (
     <div style={{ padding: '1rem' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 0 0.5rem' }}>
-        <button onClick={() => setSelectedDate(addDaysISO(selectedDate, -1))} style={dateNavBtn}>‹</button>
-        <span style={{ color: theme.colors.text, fontSize: '0.9rem', fontWeight: 600, minWidth: '9rem', textAlign: 'center' }}>
-          {isToday ? 'Schemalagt idag' : formatDateLabel(selectedDate)}
-        </span>
-        <button onClick={() => setSelectedDate(addDaysISO(selectedDate, 1))} style={dateNavBtn}>›</button>
-        {!isToday && (
-          <button onClick={() => setSelectedDate(todayISO())} style={{ ...dateNavBtn, width: 'auto', padding: '0 0.6rem' }}>
-            Idag
-          </button>
-        )}
-        <button
-          onClick={() => setGroupByTag((g) => !g)}
-          style={{
-            marginLeft: 'auto',
-            border: `1px solid ${groupByTag ? theme.colors.primary : theme.colors.border}`,
-            background: groupByTag ? theme.colors.primary : theme.colors.surface,
-            color: groupByTag ? theme.colors.textOnPrimary : theme.colors.text,
-            borderRadius: theme.radius.sm,
-            padding: '0.35rem 0.6rem',
-            fontSize: '0.8rem',
-            cursor: 'pointer',
-          }}
-        >
-          🏷 Gruppera efter tagg
-        </button>
-        {missedItems.length > 0 && (
+      {/* Två rader istället för en enda flex-rad — på smala mobilskärmar
+          fick datumnavigering + båda actionknapparna inte plats på en
+          rad, och "🔁 Missade"-knappen (sist i ordningen) hamnade helt
+          utanför synligt viewport-bredd istället för att radbrytas
+          (KanDo Vibe #3121). Varje rad wrappar dessutom själv om den
+          fortfarande är trängd. */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', margin: '0 0 0.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button onClick={() => setSelectedDate(addDaysISO(selectedDate, -1))} style={dateNavBtn}>‹</button>
+          <span style={{ color: theme.colors.text, fontSize: '0.9rem', fontWeight: 600, minWidth: '9rem', textAlign: 'center' }}>
+            {isToday ? 'Schemalagt idag' : formatDateLabel(selectedDate)}
+          </span>
+          <button onClick={() => setSelectedDate(addDaysISO(selectedDate, 1))} style={dateNavBtn}>›</button>
+          {!isToday && (
+            <button onClick={() => setSelectedDate(todayISO())} style={{ ...dateNavBtn, width: 'auto', padding: '0 0.6rem' }}>
+              Idag
+            </button>
+          )}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           <button
-            onClick={() => setReviewMode((r) => !r)}
+            onClick={toggleGroupByTag}
             style={{
-              border: `1px solid ${reviewMode ? theme.colors.primary : theme.colors.warning}`,
-              background: reviewMode ? theme.colors.primary : theme.colors.surface,
-              color: reviewMode ? theme.colors.textOnPrimary : theme.colors.text,
+              border: `1px solid ${groupByTag ? theme.colors.primary : theme.colors.border}`,
+              background: groupByTag ? theme.colors.primary : theme.colors.surface,
+              color: groupByTag ? theme.colors.textOnPrimary : theme.colors.text,
               borderRadius: theme.radius.sm,
               padding: '0.35rem 0.6rem',
               fontSize: '0.8rem',
               cursor: 'pointer',
             }}
           >
-            🔁 Missade ({missedItems.length})
+            🏷 Gruppera efter tagg
           </button>
-        )}
+          {missedItems.length > 0 && (
+            <button
+              onClick={() => setReviewMode((r) => !r)}
+              style={{
+                border: `1px solid ${reviewMode ? theme.colors.primary : theme.colors.warning}`,
+                background: reviewMode ? theme.colors.primary : theme.colors.surface,
+                color: reviewMode ? theme.colors.textOnPrimary : theme.colors.text,
+                borderRadius: theme.radius.sm,
+                padding: '0.35rem 0.6rem',
+                fontSize: '0.8rem',
+                cursor: 'pointer',
+              }}
+            >
+              🔁 Missade ({missedItems.length})
+            </button>
+          )}
+        </div>
       </div>
 
       {reviewMode ? (

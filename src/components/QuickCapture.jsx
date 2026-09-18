@@ -204,22 +204,28 @@ export default function QuickCapture() {
   )
 }
 
+// Bytt från en blek surfaceGreen/accentSoft-bakgrund med vanlig textfärg
+// till samma tunga, ifyllda stil som pillActive (Prioriterad/Dagens Fokus)
+// ovan — valda taggar såg "undertryckta" ut istället för tydligt valda
+// (KanDo Vibe #4066, bekräftat med bifogad skärmdump).
 function TagChip({ tag, onRemove }) {
+  const isContext = tag.kind === 'context'
   return (
     <span
       onClick={onRemove}
       title="Klicka för att ta bort"
       style={{
         fontSize: '0.75rem',
+        fontWeight: 600,
         padding: '0.15rem 0.5rem',
         borderRadius: '999px',
-        background: tag.kind === 'context' ? theme.colors.accentSoft : theme.colors.surfaceGreen,
-        color: theme.colors.text,
+        background: isContext ? theme.colors.accent : theme.colors.primary,
+        color: isContext ? theme.colors.primaryDark : theme.colors.textOnPrimary,
         cursor: 'pointer',
         whiteSpace: 'nowrap',
       }}
     >
-      {tag.kind === 'context' ? '📍 ' : ''}{tag.name}
+      {isContext ? '📍 ' : ''}{tag.name}
     </span>
   )
 }

@@ -114,14 +114,16 @@ export default function TagInput({ onAdd, placeholder = '+ tagg', excludeIds, fi
               type="button"
               onMouseDown={(e) => { e.preventDefault(); pickSuggestion(t) }}
               style={{
-                display: 'block',
+                display: 'flex',
+                alignItems: 'center',
                 width: '100%',
+                minHeight: '2.75rem',
                 textAlign: 'left',
-                padding: '0.4rem 0.6rem',
+                padding: '0.6rem 0.75rem',
                 border: 'none',
                 background: 'transparent',
                 color: theme.colors.text,
-                fontSize: '0.85rem',
+                fontSize: '0.9rem',
                 cursor: 'pointer',
               }}
             >
@@ -133,15 +135,17 @@ export default function TagInput({ onAdd, placeholder = '+ tagg', excludeIds, fi
               type="button"
               onMouseDown={(e) => { e.preventDefault(); commitNew() }}
               style={{
-                display: 'block',
+                display: 'flex',
+                alignItems: 'center',
                 width: '100%',
+                minHeight: '2.75rem',
                 textAlign: 'left',
-                padding: '0.4rem 0.6rem',
+                padding: '0.6rem 0.75rem',
                 border: 'none',
                 borderTop: `1px solid ${theme.colors.border}`,
                 background: 'transparent',
                 color: theme.colors.textMuted,
-                fontSize: '0.8rem',
+                fontSize: '0.85rem',
                 cursor: 'pointer',
               }}
             >

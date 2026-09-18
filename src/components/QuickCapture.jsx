@@ -109,7 +109,10 @@ export default function QuickCapture() {
             display: 'flex',
             alignItems: 'flex-end',
             justifyContent: 'center',
-            zIndex: 100,
+            // Header is position:sticky with zIndex:150 (KandoApp.jsx) — at
+            // 100 this overlay rendered BEHIND it instead of on top (KanDo
+            // Vibe #4722, "Snabbfånga hamnar under Headern").
+            zIndex: 260,
           }}
         >
           {/* Fast höjd + egen scroll istället för auto-höjd — panelen är
@@ -120,7 +123,12 @@ export default function QuickCapture() {
               rör sig aldrig överkanten efter att panelen öppnats; bara
               mittsektionen scrollar. Spara/Avbryt låg dessutom i samma
               scrollflöde som taggarna, så den kunde hamna utom räckhåll —
-              nu fast förankrad i botten. */}
+              nu fast förankrad i botten.
+              dvh (dynamic viewport height) istället för vh: vh räknas mot
+              layout-viewporten och bryr sig inte om det virtuella
+              tangentbordet, så när tangentbordet fälldes ut hamnade Spara-
+              knappen bakom det (KanDo Vibe #4722) — dvh krymper med
+              tangentbordet på alla moderna mobilwebbläsare. */}
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
@@ -128,8 +136,8 @@ export default function QuickCapture() {
               borderRadius: `${theme.radius.lg} ${theme.radius.lg} 0 0`,
               width: '100%',
               maxWidth: '480px',
-              height: '85vh',
-              maxHeight: '85vh',
+              height: '85dvh',
+              maxHeight: '85dvh',
               boxShadow: theme.shadow.md,
               display: 'flex',
               flexDirection: 'column',

@@ -45,6 +45,13 @@ export default function DagensFokus({ selectedTagIds }) {
   const [selectedDate, setSelectedDate] = useState(todayISO())
   const [groupByTag, setGroupByTag] = useState(loadGroupByTagDefault)
   const [reviewMode, setReviewMode] = useState(false)
+  // Which non-today date the floating "gå till idag"-nudge was dismissed
+  // for — reset (nudge reappears) the moment you navigate to a DIFFERENT
+  // date, so dismissing once doesn't silently suppress it forever if you
+  // land on yesterday again some other day (KanDo Vibe #3124: woke up,
+  // was confused to be on "yesterday", ended up creating a duplicate KanDo
+  // instead of noticing the existing small inline "Idag"-button).
+  const [dismissedNudgeDate, setDismissedNudgeDate] = useState(null)
   const toggleGroupByTag = () =>
     setGroupByTag((g) => {
       const next = !g
@@ -62,6 +69,7 @@ export default function DagensFokus({ selectedTagIds }) {
     })
   const { childrenByParent } = useChildrenByParent()
   const isToday = selectedDate === todayISO()
+  const showDateNudge = !isToday && !reviewMode && dismissedNudgeDate !== selectedDate
 
   const scheduled = useLiveQuery(async () => {
     return db.items.where('scheduled_date').equals(selectedDate).toArray()
@@ -224,6 +232,57 @@ export default function DagensFokus({ selectedTagIds }) {
           )}
         </div>
       </div>
+
+      {/* Den inline "Idag"-knappen i datumraden ovan räckte inte — man
+          kan öppna appen, landa av vana på en tidigare bläddrad dag, och
+          missa den lilla knappen helt (KanDo Vibe #3124: skapade en helt
+          ny KanDo av misstag istället för att märka att man var på
+          gårdagen). Samma idé som X/Twitters flytande "nya inlägg"-banner:
+          svår att missa, men lika lätt att avfärda om man faktiskt menade
+          att bläddra hit. */}
+      {showDateNudge && (
+        <div
+          style={{
+            position: 'sticky',
+            top: 0,
+            zIndex: 140,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.6rem',
+            background: theme.colors.primary,
+            color: theme.colors.textOnPrimary,
+            borderRadius: theme.radius.sm,
+            padding: '0.5rem 0.8rem',
+            marginBottom: '0.75rem',
+            boxShadow: theme.shadow.md,
+          }}
+        >
+          <span style={{ fontSize: '0.85rem', flex: 1 }}>
+            Du tittar på {formatDateLabel(selectedDate).toLowerCase()}, inte idag.
+          </span>
+          <button
+            onClick={() => setSelectedDate(todayISO())}
+            style={{
+              border: 'none', background: theme.colors.accent, color: theme.colors.primaryDark,
+              borderRadius: theme.radius.sm, padding: '0.3rem 0.7rem', fontSize: '0.8rem',
+              fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap',
+            }}
+          >
+            Gå till idag →
+          </button>
+          <button
+            onClick={() => setDismissedNudgeDate(selectedDate)}
+            title="Dölj (visas igen om du bläddrar till en annan dag)"
+            aria-label="Dölj"
+            style={{
+              border: 'none', background: 'transparent', color: theme.colors.textOnPrimary,
+              fontSize: '1rem', lineHeight: 1, cursor: 'pointer', padding: '0.1rem 0.2rem', flexShrink: 0,
+            }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {reviewMode ? (
         <MissedReview

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { createItem, scheduleToday, togglePrioritized, toggleShoppingList } from '../hooks/useItems'
 import { addItemTag } from '../hooks/useTags'
+import { useVisualViewportHeight } from '../hooks/useVisualViewportHeight'
 import TagInput from './TagInput'
 import TagCoOccurrenceSuggestions from './TagCoOccurrenceSuggestions'
 import { theme } from '../theme'
@@ -39,6 +40,7 @@ export default function QuickCapture() {
   const [scheduledToday, setScheduledToday] = useState(false)
   const [shoppingList, setShoppingList] = useState(false)
   const [pendingTags, setPendingTags] = useState([])
+  const viewportHeight = useVisualViewportHeight()
 
   function reset() {
     setText('')
@@ -124,11 +126,15 @@ export default function QuickCapture() {
               mittsektionen scrollar. Spara/Avbryt låg dessutom i samma
               scrollflöde som taggarna, så den kunde hamna utom räckhåll —
               nu fast förankrad i botten.
-              dvh (dynamic viewport height) istället för vh: vh räknas mot
-              layout-viewporten och bryr sig inte om det virtuella
-              tangentbordet, så när tangentbordet fälldes ut hamnade Spara-
-              knappen bakom det (KanDo Vibe #4722) — dvh krymper med
-              tangentbordet på alla moderna mobilwebbläsare. */}
+              Panelhöjden var 85dvh (dynamic viewport height) — krymper med
+              tangentbordet i en vanlig Safari-flik (KanDo Vibe #4722), men
+              iOS gör INTE samma sak för en PWA startad från hemskärmen,
+              vilket är hur KanDo är tänkt att användas — Spara hamnade
+              ändå bakom tangentbordet där (KanDo Vibe #4743). window.
+              visualViewport är den faktiska källan till synligt
+              skärmutrymme oavsett hemskärm eller flik, så höjden räknas nu
+              i JS (useVisualViewportHeight) istället för att lita på att
+              CSS-enheten dvh beter sig likadant överallt. */}
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
@@ -136,8 +142,8 @@ export default function QuickCapture() {
               borderRadius: `${theme.radius.lg} ${theme.radius.lg} 0 0`,
               width: '100%',
               maxWidth: '480px',
-              height: '85dvh',
-              maxHeight: '85dvh',
+              height: Math.round(viewportHeight * 0.85),
+              maxHeight: Math.round(viewportHeight * 0.85),
               boxShadow: theme.shadow.md,
               display: 'flex',
               flexDirection: 'column',

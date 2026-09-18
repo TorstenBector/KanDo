@@ -17,10 +17,10 @@ const PIPELINE = [
 const TOOLS = [
   { icon: '🛒', title: 'Inköpslista', desc: 'Egen samlingslista för allt du märkt med "Inköpslista" — oavsett var det i övrigt ligger i flödet.' },
   { icon: '✅', title: 'Utförda', desc: 'Historik över allt du bockat av. Ångrat dig? Öppna kortet och lägg tillbaka det.' },
-  { icon: '🏷️', title: 'Tagghantering', desc: 'Egna taggar för att gruppera och filtrera — även platstaggar (📍) för sånt som hör till en viss plats.' },
+  { icon: '🏷️', title: 'Tagghantering', desc: 'Byt namn, byt typ (🏷/📍), slå ihop dubbletter, och bygg upp huvudkategorier — se avsnitt 5.' },
   { icon: '🔗', title: 'Dela', desc: 'Skapa en läslänk för allt med en viss tagg — bra för att visa upp eller dela en lista utan att bjuda in någon.' },
   { icon: '🔍', title: 'Sök', desc: 'Hittar vad som helst, oavsett flik eller status.' },
-  { icon: '👥', title: 'Filtrera på tagg', desc: 'De flesta listvyer kan filtreras på tagg högst upp — bra när en lista växer sig lång.' },
+  { icon: '👥', title: 'Filtrera på tagg', desc: 'De flesta listvyer kan filtreras på tagg högst upp — bra när en lista växer sig lång. Se avsnitt 5 för huvudkategorier.' },
 ]
 
 function Chip({ children }) {
@@ -151,6 +151,38 @@ export default function HelpView() {
               <div style={{ fontSize: '0.85rem', color: theme.colors.textMuted }}>{tool.desc}</div>
             </Card>
           ))}
+        </div>
+      </div>
+
+      <div style={{ marginTop: '1.75rem' }}>
+        <SectionHeading>5. Taggar — bygg en struktur</SectionHeading>
+        <p style={{ marginTop: 0 }}>
+          Taggar är fria — sätt dem som du vill. Två saker gör dem lättare att hålla ordning på i takt
+          med att listan växer:
+        </p>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.9rem' }}>
+          <div style={{ flex: '1 1 240px' }}>
+            <Card accent={theme.colors.primary}>
+              <div style={{ fontWeight: 700, marginBottom: '0.2rem' }}>🌳 Huvudkategorier</div>
+              <div style={{ fontSize: '0.9rem', color: theme.colors.textMuted }}>
+                I Tagghantering kan en tagg höra till en huvudkategori (t.ex. <Chip>Inne</Chip>/<Chip>Ute</Chip>/
+                <Chip>Städ</Chip> under <Chip>Hus</Chip>). Bara huvudkategorin syns i filtret högst upp till att
+                börja med — väljer du den dyker undertaggarna upp under i en egen "Förfina"-rad om du vill smalna
+                av. Sätter du en förälder flyttas alla kort som redan har undertaggen dit automatiskt.
+              </div>
+            </Card>
+          </div>
+          <div style={{ flex: '1 1 240px' }}>
+            <Card accent={theme.colors.accent}>
+              <div style={{ fontWeight: 700, marginBottom: '0.2rem' }}>💡 Brukar följa med</div>
+              <div style={{ fontSize: '0.9rem', color: theme.colors.textMuted }}>
+                Har du taggat några kort med både t.ex. <Chip>Vibe</Chip> och <Chip>KanDo</Chip> föreslår appen
+                den kombinationen automatiskt nästa gång du sätter <Chip>Vibe</Chip> på ett nytt kort — en grön
+                chip du klickar för att lägga till den andra taggen direkt, istället för att behöva komma ihåg
+                vilka taggar som brukar höra ihop.
+              </div>
+            </Card>
+          </div>
         </div>
       </div>
 

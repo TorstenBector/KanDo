@@ -1,4 +1,15 @@
+import { useState } from 'react'
 import { theme } from '../theme'
+
+const PITCH = `Har du någonsin öppnat en att-göra-app, känt press att välja rätt lista och rätt
+prioritet direkt — och stängt appen igen utan att skriva något alls? KanDo löser det:
+skriv ner tanken på några sekunder, klart. Allt — jobb, hem, ett projekt, en present du
+ska komma ihåg — landar i en enda backlog. Varje morgon visar Dagens Fokus vad som
+faktiskt behöver hända idag, och missar du en dag frågar appen dig igenom det du
+hoppade över istället för att det bara försvinner i mängden.
+
+Inget konto krävs för att börja. Allt sparas på din enhet direkt — logga in bara den
+dagen du vill synka mellan flera.`
 
 const PRINCIPLES = [
   {
@@ -16,6 +27,8 @@ const PRINCIPLES = [
 ]
 
 export default function LandingPage() {
+  const [showPitch, setShowPitch] = useState(false)
+
   return (
     <div style={{ minHeight: '100vh', background: theme.colors.bg }}>
       <header
@@ -37,6 +50,52 @@ export default function LandingPage() {
           behöver ett enkelt sätt att fånga, strukturera och genomföra dem — utan att först
           behöva bestämma kategori, prioritet eller struktur.
         </p>
+
+        <button
+          type="button"
+          onClick={() => setShowPitch((v) => !v)}
+          aria-expanded={showPitch}
+          style={{
+            display: 'block',
+            background: 'transparent',
+            border: 'none',
+            color: theme.colors.primary,
+            fontWeight: 600,
+            fontSize: '0.95rem',
+            padding: 0,
+            marginBottom: '1.25rem',
+            cursor: 'pointer',
+            textAlign: 'left',
+          }}
+        >
+          {showPitch ? '– Dölj' : 'Läs mer om vad KanDo är →'}
+        </button>
+
+        {showPitch && (
+          <div
+            style={{
+              background: theme.colors.surface,
+              border: `1px solid ${theme.colors.border}`,
+              borderRadius: theme.radius.md,
+              padding: '1.1rem 1.25rem',
+              marginBottom: '1.75rem',
+              boxShadow: theme.shadow.sm,
+            }}
+          >
+            {PITCH.split('\n\n').map((para, i) => (
+              <p
+                key={i}
+                style={{
+                  color: theme.colors.text,
+                  lineHeight: 1.55,
+                  margin: i === 0 ? '0 0 0.9rem' : 0,
+                }}
+              >
+                {para}
+              </p>
+            ))}
+          </div>
+        )}
 
         <a
           href="https://app.kando.nu"

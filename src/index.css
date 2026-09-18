@@ -13,8 +13,14 @@ html, body, #root {
      stays shifted with the rest of the app off-screen to one side until
      manually scrolled back (KanDo Vibe #2138 — "Missade hamnade halvvägs
      utanför skärmen"). Any real internal horizontal scrolling (TagChipBar's
-     chip row) has its own overflowX:auto container, unaffected by this. */
-  overflow-x: hidden;
+     chip row) has its own overflowX:auto container, unaffected by this.
+     `clip`, not `hidden` — overflow-x:hidden on ANY ancestor (even just the
+     x-axis) silently breaks position:sticky for every descendant in
+     Safari/WebKit, which is exactly why KandoApp's sticky <header> was
+     scrolling away instead of staying flytande (KanDo Vibe #4062). `clip`
+     blocks the same horizontal pan without establishing that scroll
+     container, so sticky keeps working. */
+  overflow-x: clip;
 }
 
 body {

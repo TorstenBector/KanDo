@@ -112,86 +112,100 @@ export default function QuickCapture() {
             zIndex: 100,
           }}
         >
+          {/* Fast höjd + egen scroll istället för auto-höjd — panelen är
+              bottenankrad (alignItems:'flex-end' ovan), så när innehållet
+              växte/krympte (en tagg läggs till, förslag dyker upp) flyttade
+              sig hela panelens ÖVERKANT upp/ner varje gång — "Gränssnittet
+              hoppar beroende på val" (KanDo Vibe #3506). Med fast höjd
+              rör sig aldrig överkanten efter att panelen öppnats; bara
+              mittsektionen scrollar. Spara/Avbryt låg dessutom i samma
+              scrollflöde som taggarna, så den kunde hamna utom räckhåll —
+              nu fast förankrad i botten. */}
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
               background: theme.colors.bg,
               borderRadius: `${theme.radius.lg} ${theme.radius.lg} 0 0`,
-              padding: '1rem',
               width: '100%',
               maxWidth: '480px',
+              height: '85vh',
+              maxHeight: '85vh',
               boxShadow: theme.shadow.md,
+              display: 'flex',
+              flexDirection: 'column',
             }}
           >
-            <div style={{ fontWeight: 600, color: theme.colors.text, marginBottom: '0.5rem' }}>
+            <div style={{ fontWeight: 600, color: theme.colors.text, padding: '1rem 1rem 0.5rem', flexShrink: 0 }}>
               Snabbfånga
             </div>
-            <textarea
-              autoFocus
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSave()
-              }}
-              placeholder="Tala (mikrofonen i tangentbordet), skriv, eller klistra in…"
-              rows={8}
-              style={{
-                width: '100%',
-                borderRadius: theme.radius.sm,
-                border: `1px solid ${theme.colors.border}`,
-                padding: '0.6rem',
-                fontFamily: 'inherit',
-                fontSize: '1rem',
-                resize: 'vertical',
-                boxSizing: 'border-box',
-              }}
-            />
-
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.6rem' }}>
-              <button onClick={() => setPrioritized((v) => !v)} style={prioritized ? pillActive : pill}>
-                {prioritized ? '✓ Prioriterad' : '+ Prioriterad'}
-              </button>
-              <button onClick={() => setScheduledToday((v) => !v)} style={scheduledToday ? pillActive : pill}>
-                {scheduledToday ? '✓ Dagens Fokus' : '+ Dagens Fokus'}
-              </button>
-              <button onClick={() => setShoppingList((v) => !v)} style={shoppingList ? pillActive : pill}>
-                {shoppingList ? '✓ Inköpslista' : '+ Inköpslista'}
-              </button>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.6rem', marginTop: '0.5rem' }}>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', alignItems: 'center' }}>
-                {pendingTags.filter((t) => t.kind !== 'context').map((tag) => (
-                  <TagChip key={tag.id} tag={tag} onRemove={() => setPendingTags((tags) => tags.filter((t) => t.id !== tag.id))} />
-                ))}
-                <TagInput
-                  fixedKind="category"
-                  placeholder="+ tagg"
-                  onAdd={(tag) => setPendingTags((tags) => (tags.some((t) => t.id === tag.id) ? tags : [...tags, tag]))}
-                  excludeIds={new Set(pendingTags.map((t) => t.id))}
-                />
-              </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '0.4rem', alignItems: 'center' }}>
-                {pendingTags.filter((t) => t.kind === 'context').map((tag) => (
-                  <TagChip key={tag.id} tag={tag} onRemove={() => setPendingTags((tags) => tags.filter((t) => t.id !== tag.id))} />
-                ))}
-                <TagInput
-                  fixedKind="context"
-                  placeholder="+ plats"
-                  onAdd={(tag) => setPendingTags((tags) => (tags.some((t) => t.id === tag.id) ? tags : [...tags, tag]))}
-                  excludeIds={new Set(pendingTags.map((t) => t.id))}
-                />
-              </div>
-            </div>
-
-            <div style={{ marginTop: '0.3rem' }}>
-              <TagCoOccurrenceSuggestions
-                appliedTagIds={new Set(pendingTags.map((t) => t.id))}
-                onAdd={(tag) => setPendingTags((tags) => (tags.some((t) => t.id === tag.id) ? tags : [...tags, tag]))}
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 1rem' }}>
+              <textarea
+                autoFocus
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSave()
+                }}
+                placeholder="Tala (mikrofonen i tangentbordet), skriv, eller klistra in…"
+                rows={8}
+                style={{
+                  width: '100%',
+                  borderRadius: theme.radius.sm,
+                  border: `1px solid ${theme.colors.border}`,
+                  padding: '0.6rem',
+                  fontFamily: 'inherit',
+                  fontSize: '1rem',
+                  resize: 'vertical',
+                  boxSizing: 'border-box',
+                }}
               />
+
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.6rem' }}>
+                <button onClick={() => setPrioritized((v) => !v)} style={prioritized ? pillActive : pill}>
+                  {prioritized ? '✓ Prioriterad' : '+ Prioriterad'}
+                </button>
+                <button onClick={() => setScheduledToday((v) => !v)} style={scheduledToday ? pillActive : pill}>
+                  {scheduledToday ? '✓ Dagens Fokus' : '+ Dagens Fokus'}
+                </button>
+                <button onClick={() => setShoppingList((v) => !v)} style={shoppingList ? pillActive : pill}>
+                  {shoppingList ? '✓ Inköpslista' : '+ Inköpslista'}
+                </button>
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.6rem', marginTop: '0.5rem' }}>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', alignItems: 'center' }}>
+                  {pendingTags.filter((t) => t.kind !== 'context').map((tag) => (
+                    <TagChip key={tag.id} tag={tag} onRemove={() => setPendingTags((tags) => tags.filter((t) => t.id !== tag.id))} />
+                  ))}
+                  <TagInput
+                    fixedKind="category"
+                    placeholder="+ tagg"
+                    onAdd={(tag) => setPendingTags((tags) => (tags.some((t) => t.id === tag.id) ? tags : [...tags, tag]))}
+                    excludeIds={new Set(pendingTags.map((t) => t.id))}
+                  />
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '0.4rem', alignItems: 'center' }}>
+                  {pendingTags.filter((t) => t.kind === 'context').map((tag) => (
+                    <TagChip key={tag.id} tag={tag} onRemove={() => setPendingTags((tags) => tags.filter((t) => t.id !== tag.id))} />
+                  ))}
+                  <TagInput
+                    fixedKind="context"
+                    placeholder="+ plats"
+                    onAdd={(tag) => setPendingTags((tags) => (tags.some((t) => t.id === tag.id) ? tags : [...tags, tag]))}
+                    excludeIds={new Set(pendingTags.map((t) => t.id))}
+                  />
+                </div>
+              </div>
+
+              <div style={{ marginTop: '0.3rem', paddingBottom: '1rem' }}>
+                <TagCoOccurrenceSuggestions
+                  appliedTagIds={new Set(pendingTags.map((t) => t.id))}
+                  onAdd={(tag) => setPendingTags((tags) => (tags.some((t) => t.id === tag.id) ? tags : [...tags, tag]))}
+                />
+              </div>
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.75rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', padding: '0.75rem 1rem', borderTop: `1px solid ${theme.colors.border}`, flexShrink: 0 }}>
               <button onClick={reset} style={secondaryBtn}>Avbryt</button>
               <button onClick={handleSave} disabled={saving || !text.trim()} style={primaryBtn}>
                 {saving ? 'Sparar…' : 'Spara'}

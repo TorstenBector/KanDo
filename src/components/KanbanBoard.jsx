@@ -31,6 +31,18 @@ const COLUMNS = [
   { id: 'klar', label: 'Klar' },
 ]
 
+// Clamps a drag's destination to at most one column away from where the
+// card started, in whichever direction it was dragged — dropping two or
+// more columns over (promoting or pulling back) still only moves it one
+// step, same as nudging a piece one square on a board.
+function clampToOneStep(originStatus, destStatus) {
+  const originIdx = COLUMNS.findIndex((c) => c.id === originStatus)
+  const destIdx = COLUMNS.findIndex((c) => c.id === destStatus)
+  if (originIdx === -1 || destIdx === -1 || destIdx === originIdx) return destStatus
+  const step = destIdx > originIdx ? 1 : -1
+  return COLUMNS[originIdx + step].id
+}
+
 export default function KanbanBoard({ selectedTagIds }) {
   const [detailItemId, setDetailItemId] = useState(null)
   const [triageStage, setTriageStage] = useState(null) // null | 'planerad' | 'pagar'
@@ -101,7 +113,13 @@ export default function KanbanBoard({ selectedTagIds }) {
 
     const overColumn = COLUMNS.find((c) => c.id === over.id)
     const overItem = items.find((i) => i.id === over.id)
-    const destStatus = overColumn ? overColumn.id : overItem ? overItem.status : activeItem.status
+    const rawDestStatus = overColumn ? overColumn.id : overItem ? overItem.status : activeItem.status
+    // One column at a time, like moving a game piece one square — drop
+    // anywhere past the next column and it still only lands there, whether
+    // promoting or pulling back. Dragging a second time from its new
+    // column moves it one step further, same as a fresh gesture (KanDo
+    // Vibe #3071: "flytta ett steg åt gången... som en spelpjäs").
+    const destStatus = clampToOneStep(activeItem.status, rawDestStatus)
 
     if (destStatus !== activeItem.status) {
       // Any drag within the board marks it as actively tracked here — this

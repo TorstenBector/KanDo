@@ -190,7 +190,7 @@ export default function DagensFokus({ selectedTagIds }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
           <button onClick={() => setSelectedDate(addDaysISO(selectedDate, -1))} style={dateNavBtn}>‹</button>
           <span style={{ color: theme.colors.text, fontSize: '0.9rem', fontWeight: 600, minWidth: '9rem', textAlign: 'center' }}>
-            {isToday ? 'Schemalagt idag' : formatDateLabel(selectedDate)}
+            {isToday ? "Dagens KanDo's" : formatDateLabel(selectedDate)}
           </span>
           <button onClick={() => setSelectedDate(addDaysISO(selectedDate, 1))} style={dateNavBtn}>›</button>
           {!isToday && (
@@ -212,7 +212,7 @@ export default function DagensFokus({ selectedTagIds }) {
               cursor: 'pointer',
             }}
           >
-            🏷 Gruppera efter tagg
+            🏷 Gruppera på tagg
           </button>
           {missedItems.length > 0 && (
             <button

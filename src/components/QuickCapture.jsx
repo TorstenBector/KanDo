@@ -1,70 +1,143 @@
 import { useState } from 'react'
-import { createItem, scheduleToday, togglePrioritized, toggleShoppingList } from '../hooks/useItems'
+import { createItem, scheduleToday, togglePrioritized, toggleShoppingList, addChildItem, setRecurrence, setRecurrenceWeekdays } from '../hooks/useItems'
 import { addItemTag } from '../hooks/useTags'
+import { addImage } from '../hooks/useImages'
 import { useVisualViewportHeight } from '../hooks/useVisualViewportHeight'
 import TagInput from './TagInput'
 import TagCoOccurrenceSuggestions from './TagCoOccurrenceSuggestions'
 import { theme } from '../theme'
 
-// The title used to just get cut at 80 chars with "…" — the rest of a long
-// spoken/typed capture was only reachable via the raw original_text field,
-// invisible everywhere else (including the export, until it grew a
-// fallback for exactly this). Now nothing is dropped: whatever doesn't fit
-// in the title flows into description instead — overflow from a long
-// first line, plus any further lines after it.
-function splitCapture(text) {
-  const trimmed = text.trim()
-  const firstLine = trimmed.split('\n')[0]
-  const restLines = trimmed.slice(firstLine.length).trim()
-
-  if (firstLine.length <= 80) {
-    return { title: firstLine, description: restLines || null }
-  }
-
-  // Cut at the last word boundary before 80 chars instead of mid-word,
-  // as long as that doesn't chop off more than half the line.
-  const slice = firstLine.slice(0, 80)
-  const lastSpace = slice.lastIndexOf(' ')
-  const cutAt = lastSpace > 40 ? lastSpace : 80
-  const title = firstLine.slice(0, cutAt).trim() + '…'
-  const overflow = firstLine.slice(cutAt).trim()
-  const description = [overflow, restLines].filter(Boolean).join('\n\n') || null
-  return { title, description }
-}
+const RECURRENCE_PRESETS = [
+  { value: '', label: '🔁 Ingen upprepning' },
+  { value: '7', label: '🔁 Varje vecka' },
+  { value: '14', label: '🔁 Var 14:e dag' },
+  { value: 'custom', label: '🔁 Anpassat…' },
+  { value: 'weekdays', label: '🔁 Vissa veckodagar…' },
+]
+const WEEKDAYS = [
+  { value: 1, label: 'Mån' },
+  { value: 2, label: 'Tis' },
+  { value: 3, label: 'Ons' },
+  { value: 4, label: 'Tor' },
+  { value: 5, label: 'Fre' },
+  { value: 6, label: 'Lör' },
+  { value: 7, label: 'Sön' },
+]
 
 export default function QuickCapture() {
   const [open, setOpen] = useState(false)
-  const [text, setText] = useState('')
+  const [title, setTitle] = useState('')
+  const [description, setDescription] = useState('')
   const [saving, setSaving] = useState(false)
   const [prioritized, setPrioritized] = useState(false)
   const [scheduledToday, setScheduledToday] = useState(false)
   const [shoppingList, setShoppingList] = useState(false)
   const [pendingTags, setPendingTags] = useState([])
+  const [pendingImages, setPendingImages] = useState([]) // { file, previewUrl }
+  const [pendingChildren, setPendingChildren] = useState([])
+  const [childInput, setChildInput] = useState('')
+  const [recurrenceDays, setRecurrenceDays] = useState(null)
+  const [recurrenceWeekdays, setRecurrenceWeekdaysState] = useState([])
+  const [customRecurrence, setCustomRecurrence] = useState(false)
+  const [showWeekdays, setShowWeekdays] = useState(false)
   const viewportHeight = useVisualViewportHeight()
 
   function reset() {
-    setText('')
+    setTitle('')
+    setDescription('')
     setPrioritized(false)
     setScheduledToday(false)
     setShoppingList(false)
     setPendingTags([])
+    pendingImages.forEach((p) => URL.revokeObjectURL(p.previewUrl))
+    setPendingImages([])
+    setPendingChildren([])
+    setChildInput('')
+    setRecurrenceDays(null)
+    setRecurrenceWeekdaysState([])
+    setCustomRecurrence(false)
+    setShowWeekdays(false)
     setOpen(false)
   }
 
+  function handleImageSelect(e) {
+    const file = e.target.files?.[0]
+    e.target.value = '' // allow picking the same file again
+    if (!file) return
+    setPendingImages((prev) => [...prev, { file, previewUrl: URL.createObjectURL(file) }])
+  }
+
+  function removePendingImage(previewUrl) {
+    setPendingImages((prev) => prev.filter((p) => {
+      if (p.previewUrl === previewUrl) {
+        URL.revokeObjectURL(p.previewUrl)
+        return false
+      }
+      return true
+    }))
+  }
+
+  function addPendingChild() {
+    const t = childInput.trim()
+    if (!t) return
+    setPendingChildren((prev) => [...prev, t])
+    setChildInput('')
+  }
+
+  function handleRecurrenceChange(value) {
+    if (value === 'custom') {
+      setCustomRecurrence(true)
+      setShowWeekdays(false)
+      return
+    }
+    if (value === 'weekdays') {
+      setShowWeekdays(true)
+      setCustomRecurrence(false)
+      return
+    }
+    setCustomRecurrence(false)
+    setShowWeekdays(false)
+    setRecurrenceDays(value ? Number(value) : null)
+    setRecurrenceWeekdaysState([])
+  }
+
+  function toggleWeekday(day) {
+    setRecurrenceWeekdaysState((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort()))
+  }
+
+  const recurrencePreset = recurrenceWeekdays.length
+    ? 'weekdays'
+    : ([7, 14].includes(recurrenceDays) ? String(recurrenceDays) : (recurrenceDays ? 'custom' : ''))
+
+  // Titel+tagg räcker för att spara direkt — allt annat är valfritt djup,
+  // ingenting av det får blockera det snabba fånget (KanDo Vibe #5492:
+  // "Räcker det med en titel och en tag så skall jag kunna spara direkt").
   async function handleSave() {
-    const trimmed = text.trim()
-    if (!trimmed) return
+    const trimmedTitle = title.trim()
+    if (!trimmedTitle) return
     setSaving(true)
-    const { title, description } = splitCapture(trimmed)
-    const item = await createItem({ type: 'idea', title, original_text: trimmed, description })
-    // New item always starts in Backlog — togglePrioritized flips it to
-    // Prioriterad (with a correct priority_rank), same as the "+ Prioriterad"
-    // pill elsewhere.
+    const item = await createItem({
+      type: 'idea',
+      title: trimmedTitle,
+      original_text: trimmedTitle,
+      description: description.trim() || null,
+    })
     if (prioritized) await togglePrioritized(item.id)
     if (scheduledToday) await scheduleToday(item.id)
     if (shoppingList) await toggleShoppingList(item.id)
     for (const tag of pendingTags) {
       await addItemTag(item.id, tag.id)
+    }
+    for (const { file } of pendingImages) {
+      await addImage(item.id, file)
+    }
+    for (const childTitle of pendingChildren) {
+      await addChildItem(item.id, childTitle)
+    }
+    if (recurrenceWeekdays.length > 0) {
+      await setRecurrenceWeekdays(item.id, recurrenceWeekdays)
+    } else if (recurrenceDays) {
+      await setRecurrence(item.id, recurrenceDays)
     }
     setSaving(false)
     reset()
@@ -72,10 +145,6 @@ export default function QuickCapture() {
 
   return (
     <>
-      {/* Hidden while the panel is open — it sits at a higher z-index than
-          the panel overlay (so it stays reachable from every other screen),
-          which otherwise floats it right on top of the panel's own Spara
-          button in the same bottom-right corner. */}
       {!open && (
         <button
           onClick={() => setOpen(true)}
@@ -109,72 +178,163 @@ export default function QuickCapture() {
             inset: 0,
             background: 'rgba(26,58,26,0.45)',
             display: 'flex',
-            alignItems: 'flex-end',
+            // Toppankrad istället för bottenankrad (var: alignItems:'flex-end').
+            // Ett tangentbord växer alltid UPPÅT FRÅN skärmens botten — så
+            // länge panelens kritiska rad (Titel + Spara/Avbryt) ligger fast
+            // i toppen kan den aldrig hamna bakom tangentbordet, oavsett om
+            // visualViewport/dvh råkar räkna fel i en installerad PWA
+            // (KanDo Vibe #4722/#4743/#3506 — tidigare lösningsförsök som
+            // alla försökte kompensera EFTER att panelen redan var
+            // bottenankrad, istället för att ta bort själva anledningen till
+            // att den kunde kollidera med tangentbordet). KanDo Vibe #5492:
+            // samma symptom dök upp igen med en ny skärmdump, så den gamla
+            // fixen räckte inte — bytt strategi helt istället för att lappa
+            // ännu en gång.
+            alignItems: 'flex-start',
             justifyContent: 'center',
-            // Header is position:sticky with zIndex:150 (KandoApp.jsx) — at
-            // 100 this overlay rendered BEHIND it instead of on top (KanDo
-            // Vibe #4722, "Snabbfånga hamnar under Headern").
             zIndex: 260,
+            paddingTop: 'env(safe-area-inset-top, 0px)',
           }}
         >
-          {/* Fast höjd + egen scroll istället för auto-höjd — panelen är
-              bottenankrad (alignItems:'flex-end' ovan), så när innehållet
-              växte/krympte (en tagg läggs till, förslag dyker upp) flyttade
-              sig hela panelens ÖVERKANT upp/ner varje gång — "Gränssnittet
-              hoppar beroende på val" (KanDo Vibe #3506). Med fast höjd
-              rör sig aldrig överkanten efter att panelen öppnats; bara
-              mittsektionen scrollar. Spara/Avbryt låg dessutom i samma
-              scrollflöde som taggarna, så den kunde hamna utom räckhåll —
-              nu fast förankrad i botten.
-              Panelhöjden var 85dvh (dynamic viewport height) — krymper med
-              tangentbordet i en vanlig Safari-flik (KanDo Vibe #4722), men
-              iOS gör INTE samma sak för en PWA startad från hemskärmen,
-              vilket är hur KanDo är tänkt att användas — Spara hamnade
-              ändå bakom tangentbordet där (KanDo Vibe #4743). window.
-              visualViewport är den faktiska källan till synligt
-              skärmutrymme oavsett hemskärm eller flik, så höjden räknas nu
-              i JS (useVisualViewportHeight) istället för att lita på att
-              CSS-enheten dvh beter sig likadant överallt. */}
           <div
             onClick={(e) => e.stopPropagation()}
             style={{
               background: theme.colors.bg,
-              borderRadius: `${theme.radius.lg} ${theme.radius.lg} 0 0`,
+              borderRadius: `0 0 ${theme.radius.lg} ${theme.radius.lg}`,
               width: '100%',
               maxWidth: '480px',
-              height: Math.round(viewportHeight * 0.85),
-              maxHeight: Math.round(viewportHeight * 0.85),
+              maxHeight: Math.round(viewportHeight * 0.92),
               boxShadow: theme.shadow.md,
               display: 'flex',
               flexDirection: 'column',
             }}
           >
-            <div style={{ fontWeight: 600, color: theme.colors.text, padding: '1rem 1rem 0.5rem', flexShrink: 0 }}>
-              Snabbfånga
-            </div>
-            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0 1rem' }}>
-              <textarea
+            {/* Fast rad: Titel + Spara/Avbryt högst upp till höger (KanDo
+                Vibe #5492 — bytt från botten). Räcker med detta för att
+                spara — allt nedan är valfritt djup. */}
+            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', padding: '0.75rem 1rem', flexShrink: 0 }}>
+              <input
                 autoFocus
-                value={text}
-                onChange={(e) => setText(e.target.value)}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSave()
                 }}
-                placeholder="Tala (mikrofonen i tangentbordet), skriv, eller klistra in…"
-                rows={8}
+                placeholder="Titel (tala via mikrofonen, skriv, eller klistra in…)"
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  borderRadius: theme.radius.sm,
+                  border: `1px solid ${theme.colors.border}`,
+                  padding: '0.5rem 0.6rem',
+                  fontFamily: 'inherit',
+                  fontSize: '1rem',
+                  fontWeight: 600,
+                  boxSizing: 'border-box',
+                }}
+              />
+              <button onClick={reset} style={secondaryBtn}>Avbryt</button>
+              <button onClick={handleSave} disabled={saving || !title.trim()} style={primaryBtn}>
+                {saving ? '…' : 'Spara'}
+              </button>
+            </div>
+
+            {/* Taggar — "ett absolut måste att kunna lägga till" (KanDo Vibe
+                #5492), därför fast i toppen tillsammans med Titel, inte
+                nedbäddat i det scrollbara "mer info"-läget nedan. */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.6rem', padding: '0 1rem 0.75rem', flexShrink: 0, borderBottom: `1px solid ${theme.colors.border}`, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', alignItems: 'center' }}>
+                {pendingTags.filter((t) => t.kind !== 'context').map((tag) => (
+                  <TagChip key={tag.id} tag={tag} onRemove={() => setPendingTags((tags) => tags.filter((t) => t.id !== tag.id))} />
+                ))}
+                <TagInput
+                  fixedKind="category"
+                  placeholder="+ tagg"
+                  onAdd={(tag) => setPendingTags((tags) => (tags.some((t) => t.id === tag.id) ? tags : [...tags, tag]))}
+                  excludeIds={new Set(pendingTags.map((t) => t.id))}
+                />
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '0.4rem', alignItems: 'center' }}>
+                {pendingTags.filter((t) => t.kind === 'context').map((tag) => (
+                  <TagChip key={tag.id} tag={tag} onRemove={() => setPendingTags((tags) => tags.filter((t) => t.id !== tag.id))} />
+                ))}
+                <TagInput
+                  fixedKind="context"
+                  placeholder="+ plats"
+                  onAdd={(tag) => setPendingTags((tags) => (tags.some((t) => t.id === tag.id) ? tags : [...tags, tag]))}
+                  excludeIds={new Set(pendingTags.map((t) => t.id))}
+                />
+              </div>
+            </div>
+
+            {/* Scrollbart "mer info"-läge — valfritt djup, blockerar aldrig
+                snabbspara ovan (KanDo Vibe #5492: "räcker det med en titel
+                och en tag så skall jag kunna spara direkt"). */}
+            <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0.85rem 1rem 1rem' }}>
+              <div style={{ marginBottom: '0.4rem' }}>
+                <TagCoOccurrenceSuggestions
+                  appliedTagIds={new Set(pendingTags.map((t) => t.id))}
+                  onAdd={(tag) => setPendingTags((tags) => (tags.some((t) => t.id === tag.id) ? tags : [...tags, tag]))}
+                />
+              </div>
+
+              <label style={labelStyle}>Beskrivning</label>
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="En mening eller två extra — hjälper dig hitta rätt KanDo senare och undvika dubletter."
+                rows={3}
                 style={{
                   width: '100%',
                   borderRadius: theme.radius.sm,
                   border: `1px solid ${theme.colors.border}`,
-                  padding: '0.6rem',
+                  padding: '0.5rem 0.6rem',
                   fontFamily: 'inherit',
-                  fontSize: '1rem',
+                  fontSize: '0.9rem',
                   resize: 'vertical',
                   boxSizing: 'border-box',
+                  marginBottom: '0.85rem',
                 }}
               />
 
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginTop: '0.6rem' }}>
+              <label style={labelStyle}>Bilder</label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.85rem' }}>
+                {pendingImages.map(({ file, previewUrl }) => (
+                  <div key={previewUrl} style={{ position: 'relative' }}>
+                    <img
+                      src={previewUrl}
+                      alt=""
+                      style={{ width: '4.5rem', height: '4.5rem', objectFit: 'cover', borderRadius: theme.radius.sm, border: `1px solid ${theme.colors.border}`, display: 'block' }}
+                    />
+                    <button
+                      onClick={() => removePendingImage(previewUrl)}
+                      title="Ta bort bild"
+                      style={{
+                        position: 'absolute', top: '-6px', right: '-6px',
+                        width: '1.2rem', height: '1.2rem', borderRadius: '50%',
+                        border: 'none', background: theme.colors.danger, color: '#fff',
+                        fontSize: '0.7rem', cursor: 'pointer', lineHeight: 1, padding: 0,
+                      }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+                <label
+                  style={{
+                    width: '4.5rem', height: '4.5rem', borderRadius: theme.radius.sm,
+                    border: `1px dashed ${theme.colors.border}`, display: 'flex',
+                    alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                    color: theme.colors.textMuted, fontSize: '0.7rem', textAlign: 'center',
+                  }}
+                >
+                  📷 +
+                  <input type="file" accept="image/*" onChange={handleImageSelect} style={{ display: 'none' }} />
+                </label>
+              </div>
+
+              <label style={labelStyle}>Administrativt</label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
                 <button onClick={() => setPrioritized((v) => !v)} style={prioritized ? pillActive : pill}>
                   {prioritized ? '✓ Prioriterad' : '+ Prioriterad'}
                 </button>
@@ -185,45 +345,67 @@ export default function QuickCapture() {
                   {shoppingList ? '✓ Inköpslista' : '+ Inköpslista'}
                 </button>
               </div>
-
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.6rem', marginTop: '0.5rem' }}>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', alignItems: 'center' }}>
-                  {pendingTags.filter((t) => t.kind !== 'context').map((tag) => (
-                    <TagChip key={tag.id} tag={tag} onRemove={() => setPendingTags((tags) => tags.filter((t) => t.id !== tag.id))} />
-                  ))}
-                  <TagInput
-                    fixedKind="category"
-                    placeholder="+ tagg"
-                    onAdd={(tag) => setPendingTags((tags) => (tags.some((t) => t.id === tag.id) ? tags : [...tags, tag]))}
-                    excludeIds={new Set(pendingTags.map((t) => t.id))}
+              <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.85rem' }}>
+                <select
+                  value={recurrencePreset}
+                  onChange={(e) => handleRecurrenceChange(e.target.value)}
+                  style={selectStyle}
+                >
+                  {RECURRENCE_PRESETS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+                {customRecurrence && (
+                  <input
+                    type="number"
+                    min="1"
+                    autoFocus
+                    placeholder="antal dagar"
+                    onBlur={(e) => {
+                      const days = Number(e.target.value)
+                      if (days > 0) setRecurrenceDays(days)
+                      setCustomRecurrence(false)
+                    }}
+                    onKeyDown={(e) => e.key === 'Enter' && e.target.blur()}
+                    style={{ ...selectStyle, width: '110px' }}
                   />
-                </div>
-                <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '0.4rem', alignItems: 'center' }}>
-                  {pendingTags.filter((t) => t.kind === 'context').map((tag) => (
-                    <TagChip key={tag.id} tag={tag} onRemove={() => setPendingTags((tags) => tags.filter((t) => t.id !== tag.id))} />
-                  ))}
-                  <TagInput
-                    fixedKind="context"
-                    placeholder="+ plats"
-                    onAdd={(tag) => setPendingTags((tags) => (tags.some((t) => t.id === tag.id) ? tags : [...tags, tag]))}
-                    excludeIds={new Set(pendingTags.map((t) => t.id))}
-                  />
-                </div>
+                )}
+                {(showWeekdays || recurrencePreset === 'weekdays') && (
+                  <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', width: '100%' }}>
+                    {WEEKDAYS.map((w) => {
+                      const active = recurrenceWeekdays.includes(w.value)
+                      return (
+                        <button key={w.value} onClick={() => toggleWeekday(w.value)} style={active ? weekdayPillActive : weekdayPill}>
+                          {w.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
 
-              <div style={{ marginTop: '0.3rem', paddingBottom: '1rem' }}>
-                <TagCoOccurrenceSuggestions
-                  appliedTagIds={new Set(pendingTags.map((t) => t.id))}
-                  onAdd={(tag) => setPendingTags((tags) => (tags.some((t) => t.id === tag.id) ? tags : [...tags, tag]))}
-                />
+              <label style={labelStyle}>Ny deluppgift</label>
+              <div>
+                {pendingChildren.map((t, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.3rem 0', fontSize: '0.85rem', color: theme.colors.text }}>
+                    <span style={{ flex: 1 }}>{t}</span>
+                    <button
+                      onClick={() => setPendingChildren((prev) => prev.filter((_, j) => j !== i))}
+                      style={{ border: 'none', background: 'transparent', color: theme.colors.textMuted, cursor: 'pointer', fontSize: '0.85rem' }}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+                <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.3rem' }}>
+                  <input
+                    value={childInput}
+                    onChange={(e) => setChildInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addPendingChild())}
+                    placeholder="+ ny deluppgift"
+                    style={{ ...selectStyle, flex: 1 }}
+                  />
+                  <button onClick={addPendingChild} style={secondaryBtn}>Lägg till</button>
+                </div>
               </div>
-            </div>
-
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', padding: '0.75rem 1rem', borderTop: `1px solid ${theme.colors.border}`, flexShrink: 0 }}>
-              <button onClick={reset} style={secondaryBtn}>Avbryt</button>
-              <button onClick={handleSave} disabled={saving || !text.trim()} style={primaryBtn}>
-                {saving ? 'Sparar…' : 'Spara'}
-              </button>
             </div>
           </div>
         </div>
@@ -258,6 +440,23 @@ function TagChip({ tag, onRemove }) {
   )
 }
 
+const labelStyle = {
+  display: 'block',
+  fontSize: '0.75rem',
+  color: theme.colors.textMuted,
+  fontWeight: 600,
+  marginBottom: '0.3rem',
+}
+
+const selectStyle = {
+  padding: '0.45rem 0.6rem',
+  borderRadius: theme.radius.sm,
+  border: `1px solid ${theme.colors.border}`,
+  fontSize: '0.9rem',
+  boxSizing: 'border-box',
+  fontFamily: 'inherit',
+}
+
 const primaryBtn = {
   background: theme.colors.primary,
   color: theme.colors.textOnPrimary,
@@ -266,6 +465,7 @@ const primaryBtn = {
   padding: '0.5rem 1rem',
   cursor: 'pointer',
   fontWeight: 600,
+  flexShrink: 0,
 }
 
 const secondaryBtn = {
@@ -275,6 +475,7 @@ const secondaryBtn = {
   borderRadius: theme.radius.sm,
   padding: '0.5rem 1rem',
   cursor: 'pointer',
+  flexShrink: 0,
 }
 
 const pill = {
@@ -292,4 +493,22 @@ const pillActive = {
   border: `1px solid ${theme.colors.primary}`,
   background: theme.colors.primary,
   color: theme.colors.textOnPrimary,
+}
+
+const weekdayPill = {
+  fontSize: '0.8rem',
+  border: `1px solid ${theme.colors.border}`,
+  borderRadius: '999px',
+  padding: '0.3rem 0.65rem',
+  background: 'transparent',
+  color: theme.colors.textMuted,
+  cursor: 'pointer',
+}
+
+const weekdayPillActive = {
+  ...weekdayPill,
+  border: `1px solid ${theme.colors.primary}`,
+  background: theme.colors.primary,
+  color: theme.colors.textOnPrimary,
+  fontWeight: 600,
 }

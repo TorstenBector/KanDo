@@ -62,12 +62,34 @@ export async function pushPendingChanges(userId) {
     await db.tags.update(tag.id, { _syncStatus: 'synced' })
   }
 
+  // Pushed one row at a time, not as a single bulk upsert. Pull only ever
+  // adds/updates item_tags — it never removes a local link whose tag or
+  // item has since been deleted elsewhere — so a device that's been offline
+  // can carry a stale link whose tag_id/item_id no longer exists remotely.
+  // A bulk upsert would let that one bad row fail the *entire* batch, every
+  // single sync, forever (this is what "Väldigt spännande fel" / a
+  // never-resolving Synkfel on item_tags almost always is). Per-row, a
+  // dangling foreign key only kills its own row — and self-heals by
+  // deleting the stale local link, so it stops being resent next cycle.
   const localItemIds = (await db.items.where('user_id').equals(userId).primaryKeys())
   if (localItemIds.length > 0) {
     const links = await db.item_tags.where('item_id').anyOf(localItemIds).toArray()
-    if (links.length > 0) {
-      const { error } = await supabase.from('item_tags').upsert(links)
-      if (error) itemErrors.push(`taggkopplingar: ${error.message}`)
+    let staleLinks = 0
+    for (const link of links) {
+      const { error } = await supabase.from('item_tags').upsert(link)
+      if (error) {
+        if (error.code === '23503') {
+          // Foreign key violation: the tag or item this link points to is
+          // gone on the server. Nothing to retry — drop the local orphan.
+          await db.item_tags.delete([link.item_id, link.tag_id])
+          staleLinks++
+        } else {
+          itemErrors.push(`taggkoppling: ${error.message}`)
+        }
+      }
+    }
+    if (staleLinks > 0) {
+      console.warn(`Sync: tog bort ${staleLinks} inaktuell(a) taggkoppling(ar) som pekade på borttagen tagg/KanDo.`)
     }
   }
 

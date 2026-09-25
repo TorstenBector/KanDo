@@ -9,7 +9,7 @@ import ItemDetailModal from './ItemDetailModal'
 import TagInput from './TagInput'
 import TagCoOccurrenceSuggestions from './TagCoOccurrenceSuggestions'
 import TriageReview from './TriageReview'
-import { todayISO } from '../lib/date'
+import { todayISO, parseLocalDateISO } from '../lib/date'
 import { theme } from '../theme'
 
 const TYPE_TABS = [
@@ -20,6 +20,13 @@ const TYPE_TABS = [
 ]
 
 const STATUS_LABEL = { backlog: 'Backlog', prioriterad: 'Prioriterad', planerad: 'Planerad', pagar: 'Pågår', klar: 'Klar' }
+
+// Kort datum för kortets statusrad, t.ex. "mån 28 sep" — hela
+// veckodag+månad (som i Dagens Fokus) tar för mycket plats bredvid
+// typ-väljaren på en mobilskärm.
+function formatShortDate(iso) {
+  return parseLocalDateISO(iso).toLocaleDateString('sv-SE', { weekday: 'short', day: 'numeric', month: 'short' }).replace(/\./g, '')
+}
 
 const PRIORITY_OPTIONS = [
   { value: '', label: 'Ingen prio' },
@@ -325,7 +332,7 @@ function BacklogItemRow({ item, onOpenDetail, childCount = 0, collapsed = false,
           ✓
         </button>
         <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', marginBottom: '0.1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.2rem 0.4rem', flexWrap: 'wrap', marginBottom: '0.1rem' }}>
             <select
               value={item.type}
               onChange={(e) => updateItem(item.id, { type: e.target.value })}
@@ -345,6 +352,19 @@ function BacklogItemRow({ item, onOpenDetail, childCount = 0, collapsed = false,
               <option value="task">Task</option>
             </select>
             <span style={{ fontSize: '0.7rem', color: theme.colors.textMuted }}>· {STATUS_LABEL[item.status] ?? item.status}</span>
+            {/* Planerat datum direkt på kortet, så man slipper klicka in för
+                att se om en KanDo redan är schemalagd (KanDo Vibe #6761).
+                Idag syns redan via "✓ I Dagens Fokus"-knappen nedan. */}
+            {item.scheduled_date && !isScheduledToday && (
+              <span style={{
+                fontSize: '0.7rem',
+                fontWeight: 600,
+                color: item.scheduled_date < todayISO() ? theme.colors.warning : theme.colors.primary,
+                whiteSpace: 'nowrap',
+              }}>
+                📅 {formatShortDate(item.scheduled_date)}
+              </span>
+            )}
           </div>
           <TitleField
             itemId={item.id}

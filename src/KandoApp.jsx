@@ -38,7 +38,7 @@ const TABS = [
 ]
 
 // Tabs where a tag chip makes sense as a filter — every list/board view.
-const TAG_FILTER_TABS = new Set(['fokus', 'backlog', 'prio', 'kanban', 'shopping', 'utforda'])
+const TAG_FILTER_TABS = new Set(['fokus', 'backlog', 'prio', 'kanban', 'shopping', 'utforda', 'sok'])
 
 export default function KandoApp() {
   const [tab, setTab] = useState('fokus')
@@ -219,7 +219,7 @@ export default function KandoApp() {
         {tab === 'utforda' && <UtfordaView selectedTagIds={selectedTagIds} />}
         {tab === 'dela' && <ShareListManager />}
         {tab === 'taggar' && <TagManagementView />}
-        {tab === 'sok' && <SearchView />}
+        {tab === 'sok' && <SearchView selectedTagIds={selectedTagIds} onToggleTag={toggleTag} />}
         {tab === 'hjalp' && <HelpView />}
       </main>
 

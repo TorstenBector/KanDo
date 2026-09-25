@@ -180,16 +180,16 @@ export default function DagensFokus({ selectedTagIds }) {
 
   return (
     <div style={{ padding: '1rem' }}>
-      {/* Två rader istället för en enda flex-rad — på smala mobilskärmar
-          fick datumnavigering + båda actionknapparna inte plats på en
-          rad, och "🔁 Missade"-knappen (sist i ordningen) hamnade helt
-          utanför synligt viewport-bredd istället för att radbrytas
-          (KanDo Vibe #3121). Varje rad wrappar dessutom själv om den
-          fortfarande är trängd. */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem', margin: '0 0 0.5rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+      {/* En wrappande rad med två grupper: datumnavigering till vänster,
+          actionknappar till höger. Får båda plats hamnar de på samma rad
+          (KanDo Vibe #6777 — "Dagens KanDo's" + "Gruppera på tagg" delades
+          på två rader i onödan); annars wrappar actiongruppen som helhet
+          till nästa rad, så "🔁 Missade" aldrig hamnar utanför viewport
+          (KanDo Vibe #3121). */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem 0.5rem', flexWrap: 'wrap', margin: '0 0 0.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <button onClick={() => setSelectedDate(addDaysISO(selectedDate, -1))} style={dateNavBtn}>‹</button>
-          <span style={{ color: theme.colors.text, fontSize: '0.9rem', fontWeight: 600, minWidth: '9rem', textAlign: 'center' }}>
+          <span style={{ color: theme.colors.text, fontSize: '0.9rem', fontWeight: 600, minWidth: '8rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
             {isToday ? "Dagens KanDo's" : formatDateLabel(selectedDate)}
           </span>
           <button onClick={() => setSelectedDate(addDaysISO(selectedDate, 1))} style={dateNavBtn}>›</button>
@@ -199,7 +199,7 @@ export default function DagensFokus({ selectedTagIds }) {
             </button>
           )}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end', marginLeft: 'auto' }}>
           <button
             onClick={toggleGroupByTag}
             style={{

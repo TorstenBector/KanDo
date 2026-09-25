@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
-import { useSyncStore } from '../store/syncStore'
+import { useSyncStore, countUnsyncedChanges } from '../store/syncStore'
 import SetPasswordModal from './SetPasswordModal'
 import { theme } from '../theme'
 
@@ -31,6 +31,27 @@ export default function AccountPanel({ open: controlledOpen, onOpenChange } = {}
     []
   )
   const [updating, setUpdating] = useState(false)
+  const [signingOut, setSigningOut] = useState(false)
+
+  // Utloggning rensar enhetens lokala data. Försök synka först; finns det
+  // ändå osynkade ändringar kvar (offline, synkfel) måste användaren
+  // aktivt bekräfta att de försvinner.
+  async function handleSignOut() {
+    setSigningOut(true)
+    try {
+      await sync()
+      const unsynced = await countUnsyncedChanges()
+      const message = unsynced > 0
+        ? `⚠ ${unsynced} ${unsynced === 1 ? 'ändring är' : 'ändringar är'} inte synkade och försvinner permanent om du loggar ut.
+
+Logga ut ändå?`
+        : 'Logga ut? KanDo-korten tas bort från den här enheten (de finns kvar i ditt konto).'
+      if (!window.confirm(message)) return
+      await signOut()
+    } finally {
+      setSigningOut(false)
+    }
+  }
 
   // A stale PWA build (old service worker + cached assets) is a different
   // failure mode than a sync error — this app can genuinely look out of
@@ -164,7 +185,9 @@ export default function AccountPanel({ open: controlledOpen, onOpenChange } = {}
                 <button onClick={() => sync()} style={secondaryBtn} disabled={syncing}>
                   {syncing ? 'Synkar…' : 'Synka nu'}
                 </button>
-                <button onClick={() => signOut()} style={secondaryBtn}>Logga ut</button>
+                <button onClick={handleSignOut} style={secondaryBtn} disabled={signingOut || syncing}>
+                  {signingOut ? 'Loggar ut…' : 'Logga ut'}
+                </button>
               </div>
 
               <button onClick={() => setPasswordModalOpen(true)} style={miniLinkBtn}>

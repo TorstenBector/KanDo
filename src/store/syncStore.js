@@ -1,6 +1,18 @@
 import { create } from 'zustand'
 import { supabase } from '../lib/supabaseClient'
 import { claimLocalData, runFullSync, pushPendingChanges } from '../lib/sync'
+import { db } from '../lib/db'
+
+const SYNCED_TABLES = ['items', 'tags', 'item_images', 'shopping_staples']
+
+// Rows edited locally but not yet pushed — across every synced table, not
+// just items (the header badge only counts items).
+export async function countUnsyncedChanges() {
+  const counts = await Promise.all(
+    SYNCED_TABLES.map((t) => db[t].filter((r) => r._syncStatus === 'pending').count())
+  )
+  return counts.reduce((a, b) => a + b, 0)
+}
 
 export const useSyncStore = create((set, get) => ({
   isOnline: navigator.onLine,
@@ -61,9 +73,14 @@ export const useSyncStore = create((set, get) => ({
     return { error }
   },
 
+  // Logga ut rensar även all lokal data (KanDo Vibe #6774: utloggad såg
+  // man fortfarande korten, och nästa konto som loggar in på enheten
+  // skulle annars claima dem via claimLocalData). Anroparen ansvarar för
+  // att varna om osynkade ändringar först — se AccountPanel.
   async signOut() {
     await supabase.auth.signOut()
-    set({ session: null })
+    await Promise.all(db.tables.map((t) => t.clear()))
+    set({ session: null, lastSyncedAt: null, syncError: null })
   },
 
   // Deliberately NOT gated on `isOnline` — that flag comes from

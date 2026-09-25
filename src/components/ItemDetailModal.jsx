@@ -11,7 +11,11 @@ import {
 } from '../hooks/useItems'
 import { useItemTags, addItemTag } from '../hooks/useTags'
 import { useChildren, useParent } from '../hooks/useRelations'
-import { useItemImages, addImage, removeImage } from '../hooks/useImages'
+import {
+  useItemAttachments, addAttachment, removeAttachment, checkAttachmentAllowed,
+  attachmentKindOf, decodeTextAttachment, downloadAttachment,
+} from '../hooks/useAttachments'
+import FileTile from './FileTile'
 import { useEditBuffer } from '../hooks/useEditBuffer'
 import { addMonthsISO } from '../lib/date'
 import TagInput from './TagInput'
@@ -54,12 +58,13 @@ export default function ItemDetailModal({ itemId, onClose }) {
   const tags = useItemTags(itemId)
   const children = useChildren(itemId)
   const parent = useParent(itemId)
-  const images = useItemImages(itemId)
+  const attachments = useItemAttachments(itemId)
   const [childInput, setChildInput] = useState('')
   const [customRecurrence, setCustomRecurrence] = useState(false)
   const [showWeekdays, setShowWeekdays] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [lightboxImage, setLightboxImage] = useState(null)
+  const [textPreview, setTextPreview] = useState(null) // { filename, content }
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
   // Buffered locally, re-synced only when switching to a different item —
   // binding straight to item.title/description let the async Dexie
@@ -83,16 +88,50 @@ export default function ItemDetailModal({ itemId, onClose }) {
     return () => clearTimeout(t)
   }, [itemId])
 
-  async function handleImageSelect(e) {
-    const file = e.target.files?.[0]
-    e.target.value = '' // allow picking the same file again
-    if (!file) return
+  async function uploadFile(file) {
+    const error = checkAttachmentAllowed(file)
+    if (error) {
+      alert(error)
+      return
+    }
     setUploading(true)
     try {
-      await addImage(itemId, file)
+      await addAttachment(itemId, file)
+    } catch (err) {
+      console.error('Kunde inte bifoga fil', err)
+      alert('Kunde inte bifoga filen. Försök igen.')
     } finally {
       setUploading(false)
     }
+  }
+
+  function handleFileSelect(e) {
+    const file = e.target.files?.[0]
+    e.target.value = '' // allow picking the same file again
+    if (!file) return
+    uploadFile(file)
+  }
+
+  // Same clipboard-file affordance as Snabbfånga — copy a file in the OS
+  // or a clipboard screenshot, paste it straight into the card.
+  function handleModalPaste(e) {
+    const files = e.clipboardData?.files
+    if (!files || files.length === 0) return
+    e.preventDefault()
+    Array.from(files).forEach(uploadFile)
+  }
+
+  function openAttachment(att) {
+    const kind = attachmentKindOf(att)
+    if (kind === 'image') {
+      setLightboxImage(att.data_url)
+      return
+    }
+    if (kind === 'excel') {
+      downloadAttachment(att.data_url, att.filename)
+      return
+    }
+    setTextPreview({ filename: att.filename, content: decodeTextAttachment(att.data_url) })
   }
 
   if (!itemId) return null
@@ -203,6 +242,7 @@ export default function ItemDetailModal({ itemId, onClose }) {
     >
       <div
         onClick={(e) => e.stopPropagation()}
+        onPaste={handleModalPaste}
         style={{
           background: theme.colors.bg,
           borderRadius: `${theme.radius.lg} ${theme.radius.lg} 0 0`,
@@ -259,37 +299,47 @@ export default function ItemDetailModal({ itemId, onClose }) {
         />
 
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
-          {images.map((img) => (
-            <div key={img.id} style={{ position: 'relative' }}>
-              <button
-                type="button"
-                onClick={() => setLightboxImage(img.data_url)}
-                style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', display: 'block' }}
-              >
-                <img
-                  src={img.data_url}
-                  alt=""
+          {attachments.map((att) => {
+            const kind = attachmentKindOf(att)
+            const isImage = kind === 'image'
+            return (
+              <div key={att.id} style={{ position: 'relative' }}>
+                <button
+                  type="button"
+                  onClick={() => openAttachment(att)}
+                  title={isImage ? undefined : att.filename}
+                  style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', display: 'block' }}
+                >
+                  {isImage ? (
+                    <img
+                      src={att.data_url}
+                      alt=""
+                      style={{
+                        width: '4.5rem', height: '4.5rem', objectFit: 'cover',
+                        borderRadius: theme.radius.sm, border: `1px solid ${theme.colors.border}`, display: 'block',
+                      }}
+                    />
+                  ) : (
+                    <FileTile kind={kind} filename={att.filename} />
+                  )}
+                </button>
+                <button
+                  onClick={() => removeAttachment(att.id)}
+                  title="Ta bort bilaga"
                   style={{
-                    width: '4.5rem', height: '4.5rem', objectFit: 'cover',
-                    borderRadius: theme.radius.sm, border: `1px solid ${theme.colors.border}`, display: 'block',
+                    position: 'absolute', top: '-6px', right: '-6px',
+                    width: '1.2rem', height: '1.2rem', borderRadius: '50%',
+                    border: 'none', background: theme.colors.danger, color: '#fff',
+                    fontSize: '0.7rem', cursor: 'pointer', lineHeight: 1, padding: 0,
                   }}
-                />
-              </button>
-              <button
-                onClick={() => removeImage(img.id)}
-                title="Ta bort bild"
-                style={{
-                  position: 'absolute', top: '-6px', right: '-6px',
-                  width: '1.2rem', height: '1.2rem', borderRadius: '50%',
-                  border: 'none', background: theme.colors.danger, color: '#fff',
-                  fontSize: '0.7rem', cursor: 'pointer', lineHeight: 1, padding: 0,
-                }}
-              >
-                ✕
-              </button>
-            </div>
-          ))}
+                >
+                  ✕
+                </button>
+              </div>
+            )
+          })}
           <label
+            title="Bild, Markdown, Excel eller textfil"
             style={{
               width: '4.5rem', height: '4.5rem', borderRadius: theme.radius.sm,
               border: `1px dashed ${theme.colors.border}`, display: 'flex',
@@ -297,8 +347,14 @@ export default function ItemDetailModal({ itemId, onClose }) {
               color: theme.colors.textMuted, fontSize: '0.7rem', textAlign: 'center',
             }}
           >
-            {uploading ? '…' : '📷 +'}
-            <input type="file" accept="image/*" onChange={handleImageSelect} style={{ display: 'none' }} disabled={uploading} />
+            {uploading ? '…' : '📎 +'}
+            <input
+              type="file"
+              accept="image/*,.md,.markdown,.txt,.xlsx,.xls"
+              onChange={handleFileSelect}
+              style={{ display: 'none' }}
+              disabled={uploading}
+            />
           </label>
         </div>
 
@@ -505,6 +561,48 @@ export default function ItemDetailModal({ itemId, onClose }) {
         >
           ✕
         </button>
+      </div>
+    )}
+
+    {textPreview && (
+      <div
+        onClick={() => setTextPreview(null)}
+        style={{
+          position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.85)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 400, padding: '1rem', cursor: 'zoom-out',
+        }}
+      >
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            background: theme.colors.bg, borderRadius: theme.radius.sm,
+            width: '100%', maxWidth: '520px', maxHeight: '85vh',
+            display: 'flex', flexDirection: 'column', boxShadow: theme.shadow.md, cursor: 'default',
+          }}
+        >
+          <div style={{
+            display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+            padding: '0.6rem 0.8rem', borderBottom: `1px solid ${theme.colors.border}`, flexShrink: 0,
+          }}>
+            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: theme.colors.text, wordBreak: 'break-all' }}>
+              {textPreview.filename}
+            </span>
+            <button
+              onClick={() => setTextPreview(null)}
+              title="Stäng"
+              style={{ border: 'none', background: 'transparent', color: theme.colors.textMuted, cursor: 'pointer', fontSize: '1rem', lineHeight: 1 }}
+            >
+              ✕
+            </button>
+          </div>
+          <pre style={{
+            margin: 0, padding: '0.8rem', overflow: 'auto', fontSize: '0.8rem',
+            fontFamily: 'ui-monospace, monospace', whiteSpace: 'pre-wrap', color: theme.colors.text,
+          }}>
+            {textPreview.content}
+          </pre>
+        </div>
       </div>
     )}
     </>

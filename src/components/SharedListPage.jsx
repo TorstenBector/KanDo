@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
+import { isImageAttachment, attachmentKindOf, downloadAttachment } from '../hooks/useAttachments'
+import FileTile from './FileTile'
 import { theme } from '../theme'
 
 const TYPE_LABEL = { idea: 'Idé', project: 'Projekt', task: 'Task' }
@@ -262,16 +264,27 @@ function SharedItemDetailModal({ token, itemId, onClose }) {
             {detail.images?.length > 0 && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
                 {detail.images.map((img) => (
-                  <a key={img.id} href={img.data_url} target="_blank" rel="noreferrer">
-                    <img
-                      src={img.data_url}
-                      alt=""
-                      style={{
-                        width: '4.5rem', height: '4.5rem', objectFit: 'cover',
-                        borderRadius: theme.radius.sm, border: `1px solid ${theme.colors.border}`, display: 'block',
-                      }}
-                    />
-                  </a>
+                  isImageAttachment(img) ? (
+                    <a key={img.id} href={img.data_url} target="_blank" rel="noreferrer">
+                      <img
+                        src={img.data_url}
+                        alt=""
+                        style={{
+                          width: '4.5rem', height: '4.5rem', objectFit: 'cover',
+                          borderRadius: theme.radius.sm, border: `1px solid ${theme.colors.border}`, display: 'block',
+                        }}
+                      />
+                    </a>
+                  ) : (
+                    <button
+                      key={img.id}
+                      type="button"
+                      onClick={() => downloadAttachment(img.data_url, img.filename)}
+                      style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', display: 'block' }}
+                    >
+                      <FileTile kind={attachmentKindOf(img)} filename={img.filename} />
+                    </button>
+                  )
                 ))}
               </div>
             )}

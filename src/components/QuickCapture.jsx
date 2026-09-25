@@ -1,7 +1,8 @@
 import { useState } from 'react'
 import { createItem, scheduleToday, togglePrioritized, toggleShoppingList, addChildItem, setRecurrence, setRecurrenceWeekdays } from '../hooks/useItems'
 import { addItemTag } from '../hooks/useTags'
-import { addImage } from '../hooks/useImages'
+import { addAttachment, checkAttachmentAllowed, getAttachmentKind } from '../hooks/useAttachments'
+import FileTile from './FileTile'
 import { useVisualViewportHeight } from '../hooks/useVisualViewportHeight'
 import TagInput from './TagInput'
 import TagCoOccurrenceSuggestions from './TagCoOccurrenceSuggestions'
@@ -33,7 +34,7 @@ export default function QuickCapture() {
   const [scheduledToday, setScheduledToday] = useState(false)
   const [shoppingList, setShoppingList] = useState(false)
   const [pendingTags, setPendingTags] = useState([])
-  const [pendingImages, setPendingImages] = useState([]) // { file, previewUrl }
+  const [pendingAttachments, setPendingAttachments] = useState([]) // { id, file, kind, previewUrl? }
   const [pendingChildren, setPendingChildren] = useState([])
   const [childInput, setChildInput] = useState('')
   const [recurrenceDays, setRecurrenceDays] = useState(null)
@@ -49,8 +50,8 @@ export default function QuickCapture() {
     setScheduledToday(false)
     setShoppingList(false)
     setPendingTags([])
-    pendingImages.forEach((p) => URL.revokeObjectURL(p.previewUrl))
-    setPendingImages([])
+    pendingAttachments.forEach((p) => p.previewUrl && URL.revokeObjectURL(p.previewUrl))
+    setPendingAttachments([])
     setPendingChildren([])
     setChildInput('')
     setRecurrenceDays(null)
@@ -60,17 +61,44 @@ export default function QuickCapture() {
     setOpen(false)
   }
 
-  function handleImageSelect(e) {
+  function stagePendingFile(file) {
+    const error = checkAttachmentAllowed(file)
+    if (error) {
+      alert(error)
+      return
+    }
+    const kind = getAttachmentKind(file)
+    setPendingAttachments((prev) => [...prev, {
+      id: crypto.randomUUID(),
+      file,
+      kind,
+      previewUrl: kind === 'image' ? URL.createObjectURL(file) : null,
+    }])
+  }
+
+  function handleFileSelect(e) {
     const file = e.target.files?.[0]
     e.target.value = '' // allow picking the same file again
     if (!file) return
-    setPendingImages((prev) => [...prev, { file, previewUrl: URL.createObjectURL(file) }])
+    stagePendingFile(file)
   }
 
-  function removePendingImage(previewUrl) {
-    setPendingImages((prev) => prev.filter((p) => {
-      if (p.previewUrl === previewUrl) {
-        URL.revokeObjectURL(p.previewUrl)
+  // Lets a file copied in the OS (Explorer/Finder) or a clipboard screenshot
+  // be pasted straight in, as an alternative to the file picker below.
+  // Only intercepts when the clipboard actually carries a file — a plain
+  // text paste into Titel/Beskrivning has no clipboardData.files and falls
+  // through to the browser's normal paste untouched.
+  function handlePanelPaste(e) {
+    const files = e.clipboardData?.files
+    if (!files || files.length === 0) return
+    e.preventDefault()
+    Array.from(files).forEach(stagePendingFile)
+  }
+
+  function removePendingAttachment(id) {
+    setPendingAttachments((prev) => prev.filter((p) => {
+      if (p.id === id) {
+        if (p.previewUrl) URL.revokeObjectURL(p.previewUrl)
         return false
       }
       return true
@@ -112,35 +140,46 @@ export default function QuickCapture() {
   // Titel+tagg räcker för att spara direkt — allt annat är valfritt djup,
   // ingenting av det får blockera det snabba fånget (KanDo Vibe #5492:
   // "Räcker det med en titel och en tag så skall jag kunna spara direkt").
+  // try/finally krävs här: utan den lämnar ett fel mitt i sparandet
+  // (t.ex. en Dexie-skrivning som kastar) `saving` på true för gott —
+  // och eftersom QuickCapture aldrig unmountas (bara `open` växlar)
+  // sitter Spara-knappen fast på "…" och är oklickbar tills sidan
+  // laddas om, även efter att modalen stängts och öppnats igen.
   async function handleSave() {
     const trimmedTitle = title.trim()
     if (!trimmedTitle) return
     setSaving(true)
-    const item = await createItem({
-      type: 'idea',
-      title: trimmedTitle,
-      original_text: trimmedTitle,
-      description: description.trim() || null,
-    })
-    if (prioritized) await togglePrioritized(item.id)
-    if (scheduledToday) await scheduleToday(item.id)
-    if (shoppingList) await toggleShoppingList(item.id)
-    for (const tag of pendingTags) {
-      await addItemTag(item.id, tag.id)
+    try {
+      const item = await createItem({
+        type: 'idea',
+        title: trimmedTitle,
+        original_text: trimmedTitle,
+        description: description.trim() || null,
+      })
+      if (prioritized) await togglePrioritized(item.id)
+      if (scheduledToday) await scheduleToday(item.id)
+      if (shoppingList) await toggleShoppingList(item.id)
+      for (const tag of pendingTags) {
+        await addItemTag(item.id, tag.id)
+      }
+      for (const { file } of pendingAttachments) {
+        await addAttachment(item.id, file)
+      }
+      for (const childTitle of pendingChildren) {
+        await addChildItem(item.id, childTitle)
+      }
+      if (recurrenceWeekdays.length > 0) {
+        await setRecurrenceWeekdays(item.id, recurrenceWeekdays)
+      } else if (recurrenceDays) {
+        await setRecurrence(item.id, recurrenceDays)
+      }
+      reset()
+    } catch (err) {
+      console.error('Snabbfånga: kunde inte spara', err)
+      alert('Kunde inte spara. Försök igen.')
+    } finally {
+      setSaving(false)
     }
-    for (const { file } of pendingImages) {
-      await addImage(item.id, file)
-    }
-    for (const childTitle of pendingChildren) {
-      await addChildItem(item.id, childTitle)
-    }
-    if (recurrenceWeekdays.length > 0) {
-      await setRecurrenceWeekdays(item.id, recurrenceWeekdays)
-    } else if (recurrenceDays) {
-      await setRecurrence(item.id, recurrenceDays)
-    }
-    setSaving(false)
-    reset()
   }
 
   return (
@@ -198,6 +237,7 @@ export default function QuickCapture() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
+            onPaste={handlePanelPaste}
             style={{
               background: theme.colors.bg,
               borderRadius: `0 0 ${theme.radius.lg} ${theme.radius.lg}`,
@@ -297,18 +337,22 @@ export default function QuickCapture() {
                 }}
               />
 
-              <label style={labelStyle}>Bilder</label>
+              <label style={labelStyle}>Bilagor</label>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.85rem' }}>
-                {pendingImages.map(({ file, previewUrl }) => (
-                  <div key={previewUrl} style={{ position: 'relative' }}>
-                    <img
-                      src={previewUrl}
-                      alt=""
-                      style={{ width: '4.5rem', height: '4.5rem', objectFit: 'cover', borderRadius: theme.radius.sm, border: `1px solid ${theme.colors.border}`, display: 'block' }}
-                    />
+                {pendingAttachments.map(({ id, file, kind, previewUrl }) => (
+                  <div key={id} style={{ position: 'relative' }}>
+                    {kind === 'image' ? (
+                      <img
+                        src={previewUrl}
+                        alt=""
+                        style={{ width: '4.5rem', height: '4.5rem', objectFit: 'cover', borderRadius: theme.radius.sm, border: `1px solid ${theme.colors.border}`, display: 'block' }}
+                      />
+                    ) : (
+                      <FileTile kind={kind} filename={file.name} />
+                    )}
                     <button
-                      onClick={() => removePendingImage(previewUrl)}
-                      title="Ta bort bild"
+                      onClick={() => removePendingAttachment(id)}
+                      title="Ta bort bilaga"
                       style={{
                         position: 'absolute', top: '-6px', right: '-6px',
                         width: '1.2rem', height: '1.2rem', borderRadius: '50%',
@@ -321,6 +365,7 @@ export default function QuickCapture() {
                   </div>
                 ))}
                 <label
+                  title="Bild, Markdown, Excel eller textfil"
                   style={{
                     width: '4.5rem', height: '4.5rem', borderRadius: theme.radius.sm,
                     border: `1px dashed ${theme.colors.border}`, display: 'flex',
@@ -328,8 +373,13 @@ export default function QuickCapture() {
                     color: theme.colors.textMuted, fontSize: '0.7rem', textAlign: 'center',
                   }}
                 >
-                  📷 +
-                  <input type="file" accept="image/*" onChange={handleImageSelect} style={{ display: 'none' }} />
+                  📎 +
+                  <input
+                    type="file"
+                    accept="image/*,.md,.markdown,.txt,.xlsx,.xls"
+                    onChange={handleFileSelect}
+                    style={{ display: 'none' }}
+                  />
                 </label>
               </div>
 

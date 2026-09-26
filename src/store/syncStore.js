@@ -3,6 +3,8 @@ import { supabase } from '../lib/supabaseClient'
 import { claimLocalData, runFullSync, pushPendingChanges } from '../lib/sync'
 import { db } from '../lib/db'
 
+const STALE_SYNC_MS = 2 * 60 * 1000
+
 const SYNCED_TABLES = ['items', 'tags', 'item_images', 'shopping_staples']
 
 // Rows edited locally but not yet pushed — across every synced table, not
@@ -18,6 +20,7 @@ export const useSyncStore = create((set, get) => ({
   isOnline: navigator.onLine,
   session: null,
   syncing: false,
+  syncStartedAt: null,
   lastSyncedAt: null,
   syncError: null,
   authMessage: null,
@@ -90,8 +93,11 @@ export const useSyncStore = create((set, get) => ({
   // network call decide; if it fails, surface why instead of staying quiet.
   async sync() {
     const { session, syncing } = get()
-    if (!session || syncing) return
-    set({ syncing: true, syncError: null })
+    // En synk som pågått orimligt länge räknas som död — annars blockerar
+    // den varje ny synk (även "Synka nu") tills appen stängs helt.
+    const stale = syncing && Date.now() - (get().syncStartedAt ?? 0) > STALE_SYNC_MS
+    if (!session || (syncing && !stale)) return
+    set({ syncing: true, syncStartedAt: Date.now(), syncError: null })
     try {
       await runFullSync(session.user.id)
       set({ lastSyncedAt: new Date().toISOString() })

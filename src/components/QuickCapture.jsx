@@ -3,7 +3,7 @@ import { createItem, scheduleOn, togglePrioritized, toggleShoppingList, addChild
 import { addItemTag } from '../hooks/useTags'
 import { addAttachment, checkAttachmentAllowed, getAttachmentKind } from '../hooks/useAttachments'
 import FileTile from './FileTile'
-import { useVisualViewportHeight } from '../hooks/useVisualViewportHeight'
+import { useVisualViewport, isKeyboardOpen, useBodyScrollLock } from '../hooks/useVisualViewport'
 import TagInput from './TagInput'
 import TagCoOccurrenceSuggestions from './TagCoOccurrenceSuggestions'
 import { todayISO } from '../lib/date'
@@ -44,7 +44,9 @@ export default function QuickCapture() {
   const [recurrenceWeekdays, setRecurrenceWeekdaysState] = useState([])
   const [customRecurrence, setCustomRecurrence] = useState(false)
   const [showWeekdays, setShowWeekdays] = useState(false)
-  const viewportHeight = useVisualViewportHeight()
+  const viewport = useVisualViewport()
+  const keyboardOpen = isKeyboardOpen(viewport)
+  useBodyScrollLock(open)
 
   function reset() {
     setTitle('')
@@ -217,8 +219,13 @@ export default function QuickCapture() {
         <div
           onClick={reset}
           style={{
+            // Fäst mot den SYNLIGA ytan, inte fönstret — se useVisualViewport.
             position: 'fixed',
-            inset: 0,
+            left: 0,
+            right: 0,
+            top: viewport.offsetTop,
+            height: viewport.height,
+            boxSizing: 'border-box',
             background: 'rgba(26,58,26,0.45)',
             display: 'flex',
             // Toppankrad istället för bottenankrad (var: alignItems:'flex-end').
@@ -247,7 +254,11 @@ export default function QuickCapture() {
               borderRadius: `0 0 ${theme.radius.lg} ${theme.radius.lg}`,
               width: '100%',
               maxWidth: '480px',
-              maxHeight: Math.round(viewportHeight * 0.92),
+              // Med tangentbordet uppe fyller panelen hela vägen ner till
+              // det (KanDo Vibe #7282), annars lämnas en glimt av listan.
+              height: keyboardOpen ? '100%' : undefined,
+              maxHeight: keyboardOpen ? '100%' : Math.round(viewport.height * 0.92),
+              boxSizing: 'border-box',
               boxShadow: theme.shadow.md,
               display: 'flex',
               flexDirection: 'column',

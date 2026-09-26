@@ -35,7 +35,7 @@ Samma projekt och auth-instans används av **TidKoll** (tidkoll.kando.nu, repo `
 
 ## UI-mönster
 - Snabbfånga (`QuickCapture.jsx`) och kortets editläge (`ItemDetailModal.jsx`) har **samma upplägg**: toppankrad panel, Titel + Spara fast överst, Taggar/Plats under, sedan scrollbar sektion (förslag, Beskrivning, Bilagor, Administrativt, Deluppgifter). Delade kontroller i `CaptureControls.jsx` — ändra där, inte i kopior. Editläget sparar löpande; "Spara" stänger bara.
-- iOS-PWA: ankra modaler med inmatning i **toppen** (ett tangentbord kan annars dölja knappar oavsett höjdberäkning). Använd `overflow-x: clip`, inte `hidden`, på html/body/#root (hidden dödar `position: sticky` i WebKit).
+- iOS-PWA: ankra modaler med inmatning i **toppen**, fäst overlayen mot den synliga ytan med `useVisualViewport()` (`top: offsetTop`, `height`) — iOS panorerar vyn när tangentbordet öppnas och en `inset: 0`-overlay åker då ur bild — och lås sidan bakom med `useBodyScrollLock()` (annars ritas markören fel i textfält). Använd `overflow-x: clip`, inte `hidden`, på html/body/#root (hidden dödar `position: sticky` i WebKit).
 - Datumväljare: genomskinlig `<input type="date">` över en knapp + `showPicker()` (se `PlannedDatePill`).
 - Kommentarer i koden refererar ofta till Vibe-poster (`KanDo Vibe #6645`) — gör likadant när du fixar en.
 

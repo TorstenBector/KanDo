@@ -18,7 +18,7 @@ import {
 import FileTile from './FileTile'
 import { useEditBuffer } from '../hooks/useEditBuffer'
 import { addMonthsISO, todayISO } from '../lib/date'
-import { useVisualViewportHeight } from '../hooks/useVisualViewportHeight'
+import { useVisualViewport, isKeyboardOpen, useBodyScrollLock } from '../hooks/useVisualViewport'
 import { TagChip, PlannedDatePill, pill, pillActive } from './CaptureControls'
 import TagInput from './TagInput'
 import TagCoOccurrenceSuggestions from './TagCoOccurrenceSuggestions'
@@ -67,7 +67,9 @@ export default function ItemDetailModal({ itemId, onClose }) {
   const [uploading, setUploading] = useState(false)
   const [lightboxImage, setLightboxImage] = useState(null)
   const [textPreview, setTextPreview] = useState(null) // { filename, content }
-  const viewportHeight = useVisualViewportHeight()
+  const viewport = useVisualViewport()
+  const keyboardOpen = isKeyboardOpen(viewport)
+  useBodyScrollLock(!!itemId)
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
   // Buffered locally, re-synced only when switching to a different item —
   // binding straight to item.title/description let the async Dexie
@@ -248,8 +250,13 @@ export default function ItemDetailModal({ itemId, onClose }) {
     <div
       onClick={onClose}
       style={{
+        // Fäst mot den SYNLIGA ytan, inte fönstret — se useVisualViewport.
         position: 'fixed',
-        inset: 0,
+        left: 0,
+        right: 0,
+        top: viewport.offsetTop,
+        height: viewport.height,
+        boxSizing: 'border-box',
         background: 'rgba(26,58,26,0.45)',
         display: 'flex',
         alignItems: 'flex-start',
@@ -266,7 +273,8 @@ export default function ItemDetailModal({ itemId, onClose }) {
           borderRadius: `0 0 ${theme.radius.lg} ${theme.radius.lg}`,
           width: '100%',
           maxWidth: '520px',
-          maxHeight: Math.round(viewportHeight * 0.92),
+          height: keyboardOpen ? '100%' : undefined,
+          maxHeight: keyboardOpen ? '100%' : Math.round(viewport.height * 0.92),
           boxShadow: theme.shadow.md,
           boxSizing: 'border-box',
           display: 'flex',

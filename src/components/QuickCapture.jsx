@@ -6,7 +6,8 @@ import FileTile from './FileTile'
 import { useVisualViewportHeight } from '../hooks/useVisualViewportHeight'
 import TagInput from './TagInput'
 import TagCoOccurrenceSuggestions from './TagCoOccurrenceSuggestions'
-import { todayISO, formatShortDate } from '../lib/date'
+import { todayISO } from '../lib/date'
+import { TagChip, PlannedDatePill, pill, pillActive } from './CaptureControls'
 import { theme } from '../theme'
 
 const RECURRENCE_PRESETS = [
@@ -136,7 +137,6 @@ export default function QuickCapture() {
   }
 
   const isScheduledToday = scheduledDate === todayISO()
-  const isScheduledLater = !!scheduledDate && !isScheduledToday
   const recurrencePreset = recurrenceWeekdays.length
     ? 'weekdays'
     : ([7, 14].includes(recurrenceDays) ? String(recurrenceDays) : (recurrenceDays ? 'custom' : ''))
@@ -407,30 +407,7 @@ export default function QuickCapture() {
                 >
                   {RECURRENCE_PRESETS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
-                {/* Planera till ett senare datum direkt vid skapandet, t.ex.
-                    måndag nästa vecka, utan att gå via Dagens Fokus idag
-                    (KanDo Vibe #6645). Ett genomskinligt datumfält ligger
-                    över knappen: iOS öppnar den inbyggda kalendern vid tryck
-                    och showPicker() täcker desktop-webbläsare. */}
-                <div style={{ position: 'relative', display: 'flex' }}>
-                  <span style={{ ...(isScheduledLater ? pillActive : pill), display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>
-                    {isScheduledLater ? `📅 ${formatShortDate(scheduledDate)}` : '📅 Planerad till'}
-                  </span>
-                  <input
-                    type="date"
-                    min={todayISO()}
-                    value={scheduledDate ?? ''}
-                    onChange={(e) => setScheduledDate(e.target.value || null)}
-                    onClick={(e) => { try { e.currentTarget.showPicker?.() } catch { /* redan öppen / ej stöd */ } }}
-                    aria-label="Planerad till datum"
-                    style={{ position: 'absolute', inset: 0, opacity: 0, width: '100%', height: '100%', cursor: 'pointer', border: 'none', padding: 0 }}
-                  />
-                </div>
-                {isScheduledLater && (
-                  <button onClick={() => setScheduledDate(null)} title="Ta bort planerat datum" style={{ ...pill, padding: '0.3rem 0.6rem' }}>
-                    ✕
-                  </button>
-                )}
+                <PlannedDatePill value={scheduledDate} onChange={setScheduledDate} min={todayISO()} />
                 {customRecurrence && (
                   <input
                     type="number"
@@ -496,28 +473,6 @@ export default function QuickCapture() {
 // till samma tunga, ifyllda stil som pillActive (Prioriterad/Dagens Fokus)
 // ovan — valda taggar såg "undertryckta" ut istället för tydligt valda
 // (KanDo Vibe #4066, bekräftat med bifogad skärmdump).
-function TagChip({ tag, onRemove }) {
-  const isContext = tag.kind === 'context'
-  return (
-    <span
-      onClick={onRemove}
-      title="Klicka för att ta bort"
-      style={{
-        fontSize: '0.75rem',
-        fontWeight: 600,
-        padding: '0.15rem 0.5rem',
-        borderRadius: '999px',
-        background: isContext ? theme.colors.accent : theme.colors.primary,
-        color: isContext ? theme.colors.primaryDark : theme.colors.textOnPrimary,
-        cursor: 'pointer',
-        whiteSpace: 'nowrap',
-      }}
-    >
-      {isContext ? '📍 ' : ''}{tag.name}
-    </span>
-  )
-}
-
 const labelStyle = {
   display: 'block',
   fontSize: '0.75rem',
@@ -554,23 +509,6 @@ const secondaryBtn = {
   padding: '0.5rem 1rem',
   cursor: 'pointer',
   flexShrink: 0,
-}
-
-const pill = {
-  fontSize: '0.8rem',
-  border: `1px solid ${theme.colors.border}`,
-  borderRadius: '999px',
-  padding: '0.3rem 0.7rem',
-  background: 'transparent',
-  color: theme.colors.textMuted,
-  cursor: 'pointer',
-}
-
-const pillActive = {
-  ...pill,
-  border: `1px solid ${theme.colors.primary}`,
-  background: theme.colors.primary,
-  color: theme.colors.textOnPrimary,
 }
 
 const weekdayPill = {

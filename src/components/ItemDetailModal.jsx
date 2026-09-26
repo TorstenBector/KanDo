@@ -7,7 +7,7 @@ import { db } from '../lib/db'
 import {
   updateItem, deleteItem, cloneItem, setRecurrence, setRecurrenceWeekdays,
   addChildItem, removeChildRelation, reorderChildren, markDoneWithConfirm,
-  pauseItem, resumeItem, toggleShoppingList,
+  pauseItem, resumeItem, toggleShoppingList, togglePrioritized, scheduleOn, unschedule,
 } from '../hooks/useItems'
 import { useItemTags, addItemTag } from '../hooks/useTags'
 import { useChildren, useParent } from '../hooks/useRelations'
@@ -17,7 +17,9 @@ import {
 } from '../hooks/useAttachments'
 import FileTile from './FileTile'
 import { useEditBuffer } from '../hooks/useEditBuffer'
-import { addMonthsISO } from '../lib/date'
+import { addMonthsISO, todayISO } from '../lib/date'
+import { useVisualViewportHeight } from '../hooks/useVisualViewportHeight'
+import { TagChip, PlannedDatePill, pill, pillActive } from './CaptureControls'
 import TagInput from './TagInput'
 import TagCoOccurrenceSuggestions from './TagCoOccurrenceSuggestions'
 import { theme } from '../theme'
@@ -65,6 +67,7 @@ export default function ItemDetailModal({ itemId, onClose }) {
   const [uploading, setUploading] = useState(false)
   const [lightboxImage, setLightboxImage] = useState(null)
   const [textPreview, setTextPreview] = useState(null) // { filename, content }
+  const viewportHeight = useVisualViewportHeight()
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
   // Buffered locally, re-synced only when switching to a different item —
   // binding straight to item.title/description let the async Dexie
@@ -226,6 +229,20 @@ export default function ItemDetailModal({ itemId, onClose }) {
     onClose()
   }
 
+  const appliedTagIds = new Set((tags ?? []).map((t) => t.id))
+  const isScheduledToday = item.scheduled_date === todayISO()
+
+  function setPlannedDate(dateISO) {
+    if (dateISO) scheduleOn(item.id, dateISO)
+    else unschedule(item.id)
+  }
+
+  // Samma logiska upplägg som Snabbfånga (KanDo Vibe #6267): toppankrad
+  // panel, Titel + Spara fast högst upp (alltid nåbar utan att scrolla
+  // till botten), Taggar/Plats direkt under, och allt övrigt i ett
+  // scrollbart "mer info"-läge i samma ordning som Snabbfånga.
+  // Kortet sparas redan löpande vid varje ändring — "Spara" bekräftar och
+  // stänger, därför finns ingen Avbryt här.
   return (
     <>
     <div
@@ -235,9 +252,10 @@ export default function ItemDetailModal({ itemId, onClose }) {
         inset: 0,
         background: 'rgba(26,58,26,0.45)',
         display: 'flex',
-        alignItems: 'flex-end',
+        alignItems: 'flex-start',
         justifyContent: 'center',
         zIndex: 300,
+        paddingTop: 'env(safe-area-inset-top, 0px)',
       }}
     >
       <div
@@ -245,288 +263,272 @@ export default function ItemDetailModal({ itemId, onClose }) {
         onPaste={handleModalPaste}
         style={{
           background: theme.colors.bg,
-          borderRadius: `${theme.radius.lg} ${theme.radius.lg} 0 0`,
-          padding: '1rem',
+          borderRadius: `0 0 ${theme.radius.lg} ${theme.radius.lg}`,
           width: '100%',
           maxWidth: '520px',
-          maxHeight: '85vh',
-          overflowY: 'auto',
+          maxHeight: Math.round(viewportHeight * 0.92),
           boxShadow: theme.shadow.md,
           boxSizing: 'border-box',
+          display: 'flex',
+          flexDirection: 'column',
         }}
       >
-        {parent && (
-          <div style={{ fontSize: '0.75rem', color: theme.colors.textMuted, marginBottom: '0.5rem' }}>
-            ↳ Deluppgift till <strong>{parent.title}</strong>
-          </div>
-        )}
-        {item.claimed_by && (
-          <div style={{ fontSize: '0.8rem', color: theme.colors.text, marginBottom: '0.5rem' }}>
-            🙋 Tagen av <strong>{item.claimed_by}</strong> (via delad länk)
-          </div>
-        )}
-
-        {item.short_id != null && (
-          <div style={{ fontSize: '0.75rem', color: theme.colors.textMuted, marginBottom: '0.3rem' }} title="Referensnummer, tilldelat vid synk — för att peka på den här KanDo'n när vi utvecklar">
-            #{item.short_id}
-          </div>
-        )}
-
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem' }}>
-          <select
-            value={item.type}
-            onChange={(e) => updateItem(item.id, { type: e.target.value })}
-            style={selectStyle}
-          >
-            <option value="idea">Idé</option>
-            <option value="project">Projekt</option>
-            <option value="task">Task</option>
-          </select>
+        <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center', padding: '0.75rem 1rem', flexShrink: 0 }}>
           <input
             value={titleDraft}
             onChange={(e) => { setTitleDraft(e.target.value); updateItem(item.id, { title: e.target.value }) }}
-            style={{ ...inputStyle, flex: 1, fontWeight: 600, fontSize: '1.05rem' }}
+            onKeyDown={(e) => e.key === 'Enter' && (e.metaKey || e.ctrlKey) && onClose()}
+            placeholder="Titel"
+            style={{ ...inputStyle, flex: 1, minWidth: 0, padding: '0.5rem 0.6rem', fontWeight: 600, fontSize: '1rem', fontFamily: 'inherit' }}
           />
+          <button onClick={onClose} style={{ ...primaryBtn, padding: '0.5rem 1rem', flexShrink: 0 }}>Spara</button>
         </div>
 
-        <label style={labelStyle}>Beskrivning</label>
-        <textarea
-          value={descriptionDraft}
-          onChange={(e) => { setDescriptionDraft(e.target.value); updateItem(item.id, { description: e.target.value }) }}
-          placeholder="Lägg till detaljer, kontext, anteckningar…"
-          rows={4}
-          style={{ ...inputStyle, width: '100%', resize: 'vertical', fontFamily: 'inherit', marginBottom: '0.5rem' }}
-        />
-
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.75rem' }}>
-          {attachments.map((att) => {
-            const kind = attachmentKindOf(att)
-            const isImage = kind === 'image'
-            return (
-              <div key={att.id} style={{ position: 'relative' }}>
-                <button
-                  type="button"
-                  onClick={() => openAttachment(att)}
-                  title={isImage ? undefined : att.filename}
-                  style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', display: 'block' }}
-                >
-                  {isImage ? (
-                    <img
-                      src={att.data_url}
-                      alt=""
-                      style={{
-                        width: '4.5rem', height: '4.5rem', objectFit: 'cover',
-                        borderRadius: theme.radius.sm, border: `1px solid ${theme.colors.border}`, display: 'block',
-                      }}
-                    />
-                  ) : (
-                    <FileTile kind={kind} filename={att.filename} />
-                  )}
-                </button>
-                <button
-                  onClick={() => removeAttachment(att.id)}
-                  title="Ta bort bilaga"
-                  style={{
-                    position: 'absolute', top: '-6px', right: '-6px',
-                    width: '1.2rem', height: '1.2rem', borderRadius: '50%',
-                    border: 'none', background: theme.colors.danger, color: '#fff',
-                    fontSize: '0.7rem', cursor: 'pointer', lineHeight: 1, padding: 0,
-                  }}
-                >
-                  ✕
-                </button>
-              </div>
-            )
-          })}
-          <label
-            title="Bild, Markdown, Excel eller textfil"
-            style={{
-              width: '4.5rem', height: '4.5rem', borderRadius: theme.radius.sm,
-              border: `1px dashed ${theme.colors.border}`, display: 'flex',
-              alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
-              color: theme.colors.textMuted, fontSize: '0.7rem', textAlign: 'center',
-            }}
-          >
-            {uploading ? '…' : '📎 +'}
-            <input
-              type="file"
-              accept="image/*,.md,.markdown,.txt,.xlsx,.xls"
-              onChange={handleFileSelect}
-              style={{ display: 'none' }}
-              disabled={uploading}
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.6rem', padding: '0 1rem 0.75rem', flexShrink: 0, borderBottom: `1px solid ${theme.colors.border}`, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem', alignItems: 'center' }}>
+            {(tags ?? []).filter((t) => t.kind !== 'context').map((tag) => (
+              <TagChip key={tag.id} tag={tag} onRemove={() => removeTag(tag.id)} />
+            ))}
+            <TagInput
+              fixedKind="category"
+              placeholder="+ tagg"
+              onAdd={(tag) => addItemTag(item.id, tag.id)}
+              excludeIds={appliedTagIds}
             />
-          </label>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '0.4rem', alignItems: 'center' }}>
+            {(tags ?? []).filter((t) => t.kind === 'context').map((tag) => (
+              <TagChip key={tag.id} tag={tag} onRemove={() => removeTag(tag.id)} />
+            ))}
+            <TagInput
+              fixedKind="context"
+              placeholder="+ plats"
+              onAdd={(tag) => addItemTag(item.id, tag.id)}
+              excludeIds={appliedTagIds}
+            />
+          </div>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
-          <div>
-            <label style={labelStyle}>Prioritet</label>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', padding: '0.85rem 1rem 1rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.6rem', fontSize: '0.75rem', color: theme.colors.textMuted }}>
+            {item.short_id != null && (
+              <span title="Referensnummer, tilldelat vid synk — för att peka på den här KanDo'n när vi utvecklar">#{item.short_id}</span>
+            )}
+            <select
+              value={item.type}
+              onChange={(e) => updateItem(item.id, { type: e.target.value })}
+              title="Idéer kan utvecklas till Task eller Projekt"
+              style={{ ...selectStyle, fontSize: '0.75rem', padding: '0.2rem 0.4rem' }}
+            >
+              <option value="idea">Idé</option>
+              <option value="project">Projekt</option>
+              <option value="task">Task</option>
+            </select>
+            {parent && <span>↳ Deluppgift till <strong>{parent.title}</strong></span>}
+            {item.claimed_by && <span style={{ color: theme.colors.text }}>🙋 Tagen av <strong>{item.claimed_by}</strong> (via delad länk)</span>}
+          </div>
+
+          <div style={{ marginBottom: '0.4rem' }}>
+            <TagCoOccurrenceSuggestions appliedTagIds={appliedTagIds} onAdd={(tag) => addItemTag(item.id, tag.id)} />
+          </div>
+
+          <label style={labelStyle}>Beskrivning</label>
+          <textarea
+            value={descriptionDraft}
+            onChange={(e) => { setDescriptionDraft(e.target.value); updateItem(item.id, { description: e.target.value }) }}
+            placeholder="Lägg till detaljer, kontext, anteckningar…"
+            rows={4}
+            style={{ ...inputStyle, width: '100%', resize: 'vertical', fontFamily: 'inherit', marginBottom: '0.85rem' }}
+          />
+
+          <label style={labelStyle}>Bilagor</label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.85rem' }}>
+            {attachments.map((att) => {
+              const kind = attachmentKindOf(att)
+              const isImage = kind === 'image'
+              return (
+                <div key={att.id} style={{ position: 'relative' }}>
+                  <button
+                    type="button"
+                    onClick={() => openAttachment(att)}
+                    title={isImage ? undefined : att.filename}
+                    style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', display: 'block' }}
+                  >
+                    {isImage ? (
+                      <img
+                        src={att.data_url}
+                        alt=""
+                        style={{
+                          width: '4.5rem', height: '4.5rem', objectFit: 'cover',
+                          borderRadius: theme.radius.sm, border: `1px solid ${theme.colors.border}`, display: 'block',
+                        }}
+                      />
+                    ) : (
+                      <FileTile kind={kind} filename={att.filename} />
+                    )}
+                  </button>
+                  <button
+                    onClick={() => removeAttachment(att.id)}
+                    title="Ta bort bilaga"
+                    style={{
+                      position: 'absolute', top: '-6px', right: '-6px',
+                      width: '1.2rem', height: '1.2rem', borderRadius: '50%',
+                      border: 'none', background: theme.colors.danger, color: '#fff',
+                      fontSize: '0.7rem', cursor: 'pointer', lineHeight: 1, padding: 0,
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              )
+            })}
+            <label
+              title="Bild, Markdown, Excel eller textfil"
+              style={{
+                width: '4.5rem', height: '4.5rem', borderRadius: theme.radius.sm,
+                border: `1px dashed ${theme.colors.border}`, display: 'flex',
+                alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+                color: theme.colors.textMuted, fontSize: '0.7rem', textAlign: 'center',
+              }}
+            >
+              {uploading ? '…' : '📎 +'}
+              <input
+                type="file"
+                accept="image/*,.md,.markdown,.txt,.xlsx,.xls"
+                onChange={handleFileSelect}
+                style={{ display: 'none' }}
+                disabled={uploading}
+              />
+            </label>
+          </div>
+
+          <label style={labelStyle}>Administrativt</label>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
+            <button onClick={() => togglePrioritized(item.id)} style={item.status === 'prioriterad' ? pillActive : pill}>
+              {item.status === 'prioriterad' ? '✓ Prioriterad' : '+ Prioriterad'}
+            </button>
+            <button onClick={() => (isScheduledToday ? unschedule(item.id) : scheduleOn(item.id, todayISO()))} style={isScheduledToday ? pillActive : pill}>
+              {isScheduledToday ? '✓ Dagens Fokus' : '+ Dagens Fokus'}
+            </button>
+            <button onClick={() => toggleShoppingList(item.id)} style={item.in_shopping_list ? pillActive : pill}>
+              {item.in_shopping_list ? '✓ Inköpslista' : '+ Inköpslista'}
+            </button>
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
+            <select
+              value={recurrencePreset}
+              onChange={(e) => handleRecurrenceChange(e.target.value)}
+              style={selectStyle}
+            >
+              {RECURRENCE_PRESETS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+            </select>
+            <PlannedDatePill value={item.scheduled_date} onChange={setPlannedDate} />
+            {customRecurrence && (
+              <input
+                type="number"
+                min="1"
+                autoFocus
+                placeholder="antal dagar"
+                defaultValue={item.recurrence_days && ![7, 14].includes(item.recurrence_days) ? item.recurrence_days : ''}
+                onBlur={(e) => {
+                  const days = Number(e.target.value)
+                  if (days > 0) setRecurrence(item.id, days)
+                  setCustomRecurrence(false)
+                }}
+                onKeyDown={(e) => e.key === 'Enter' && e.target.blur()}
+                style={{ ...inputStyle, width: '110px' }}
+              />
+            )}
+            {(showWeekdays || recurrencePreset === 'weekdays') && (
+              <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', width: '100%' }}>
+                {WEEKDAYS.map((w) => {
+                  const active = (item.recurrence_weekdays ?? []).includes(w.value)
+                  return (
+                    <button
+                      key={w.value}
+                      onClick={() => toggleWeekday(w.value)}
+                      style={active ? weekdayPillActive : weekdayPill}
+                    >
+                      {w.label}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '0.5rem' }}>
             <select
               value={item.backlog_priority ?? ''}
               onChange={(e) => updateItem(item.id, { backlog_priority: e.target.value || null })}
+              title="Prioritetsnivå"
               style={selectStyle}
             >
               {PRIORITY_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           </div>
-          <div>
-            <label style={labelStyle}>Schemalagt datum</label>
-            <input
-              type="date"
-              value={item.scheduled_date ?? ''}
-              onChange={(e) => updateItem(item.id, { scheduled_date: e.target.value || null })}
-              style={selectStyle}
-            />
-          </div>
-          <div>
-            <label style={labelStyle}>Inköpslista</label>
-            <button
-              onClick={() => toggleShoppingList(item.id)}
-              style={item.in_shopping_list ? { ...secondaryBtn, background: theme.colors.primary, color: theme.colors.textOnPrimary, borderColor: theme.colors.primary } : secondaryBtn}
-            >
-              {item.in_shopping_list ? '✓ I inköpslistan' : '+ Inköpslista'}
-            </button>
-          </div>
-        </div>
-
-        <label style={labelStyle}>Upprepning</label>
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
-          <select
-            value={recurrencePreset}
-            onChange={(e) => handleRecurrenceChange(e.target.value)}
-            style={selectStyle}
-          >
-            {RECURRENCE_PRESETS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-          {customRecurrence && (
-            <input
-              type="number"
-              min="1"
-              autoFocus
-              placeholder="antal dagar"
-              defaultValue={item.recurrence_days && ![7, 14].includes(item.recurrence_days) ? item.recurrence_days : ''}
-              onBlur={(e) => {
-                const days = Number(e.target.value)
-                if (days > 0) setRecurrence(item.id, days)
-                setCustomRecurrence(false)
-              }}
-              onKeyDown={(e) => e.key === 'Enter' && e.target.blur()}
-              style={{ ...inputStyle, width: '110px' }}
-            />
-          )}
-          {(showWeekdays || recurrencePreset === 'weekdays') && (
-            <div style={{ display: 'flex', gap: '0.3rem', flexWrap: 'wrap', width: '100%' }}>
-              {WEEKDAYS.map((w) => {
-                const active = (item.recurrence_weekdays ?? []).includes(w.value)
-                return (
-                  <button
-                    key={w.value}
-                    onClick={() => toggleWeekday(w.value)}
-                    style={active ? weekdayPillActive : weekdayPill}
-                  >
-                    {w.label}
+          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '0.85rem' }}>
+            {item.paused_until ? (
+              <>
+                <span style={{ fontSize: '0.85rem', color: theme.colors.text }}>
+                  🗄 Pausad till <strong>{item.paused_until}</strong>
+                </span>
+                <button onClick={() => resumeItem(item.id)} style={pill}>Återuppta nu</button>
+              </>
+            ) : (
+              <>
+                <span style={{ fontSize: '0.75rem', color: theme.colors.textMuted }}>🗄 Pausa:</span>
+                {PAUSE_PRESETS.map((p) => (
+                  <button key={p.months} onClick={() => pauseItem(item.id, addMonthsISO(p.months))} style={pill}>
+                    {p.label}
                   </button>
-                )
-              })}
-            </div>
-          )}
-        </div>
-
-        <label style={labelStyle}>Bibliotek (pausa till)</label>
-        <div style={{ marginBottom: '0.75rem' }}>
-          {item.paused_until ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: '0.85rem', color: theme.colors.text }}>
-                🗄 Pausad till <strong>{item.paused_until}</strong>
-              </span>
-              <button onClick={() => resumeItem(item.id)} style={secondaryBtn}>Återuppta nu</button>
-            </div>
-          ) : (
-            <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', alignItems: 'center' }}>
-              {PAUSE_PRESETS.map((p) => (
-                <button key={p.months} onClick={() => pauseItem(item.id, addMonthsISO(p.months))} style={secondaryBtn}>
-                  {p.label}
-                </button>
-              ))}
-              <input
-                type="date"
-                onChange={(e) => e.target.value && pauseItem(item.id, e.target.value)}
-                style={{ ...inputStyle, width: 'auto' }}
-              />
-            </div>
-          )}
-        </div>
-
-        <label style={labelStyle}>Taggar</label>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginBottom: '0.75rem', alignItems: 'center' }}>
-          {(tags ?? []).map((tag) => (
-            <span
-              key={tag.id}
-              onClick={() => removeTag(tag.id)}
-              title="Klicka för att ta bort"
-              style={{
-                fontSize: '0.75rem',
-                padding: '0.15rem 0.5rem',
-                borderRadius: '999px',
-                background: tag.kind === 'category' ? theme.colors.surfaceGreen : theme.colors.accentSoft,
-                color: theme.colors.text,
-                cursor: 'pointer',
-              }}
-            >
-              {tag.kind === 'context' ? '📍 ' : ''}{tag.name}
-            </span>
-          ))}
-          <TagInput
-            onAdd={(tag) => addItemTag(item.id, tag.id)}
-            excludeIds={new Set((tags ?? []).map((t) => t.id))}
-          />
-        </div>
-        <div style={{ marginBottom: '0.75rem', marginTop: '-0.4rem' }}>
-          <TagCoOccurrenceSuggestions
-            appliedTagIds={new Set((tags ?? []).map((t) => t.id))}
-            onAdd={(tag) => addItemTag(item.id, tag.id)}
-          />
-        </div>
-
-        <label style={labelStyle}>Deluppgifter</label>
-        <div style={{ marginBottom: '0.5rem' }}>
-          {children.length > 1 ? (
-            <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleChildDragEnd}>
-              <SortableContext items={children.map((c) => c.id)} strategy={verticalListSortingStrategy}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                  {children.map((child) => (
-                    <ChildRow key={child.id} child={child} parentId={item.id} />
-                  ))}
-                </div>
-              </SortableContext>
-            </DndContext>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-              {children.map((child) => (
-                <ChildRow key={child.id} child={child} parentId={item.id} />
-              ))}
-            </div>
-          )}
-          <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.4rem' }}>
-            <input
-              value={childInput}
-              onChange={(e) => setChildInput(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleAddChild()}
-              placeholder="+ ny deluppgift"
-              style={{ ...inputStyle, flex: 1, fontSize: '0.85rem' }}
-            />
-            <button onClick={handleAddChild} style={secondaryBtn}>Lägg till</button>
+                ))}
+                <input
+                  type="date"
+                  onChange={(e) => e.target.value && pauseItem(item.id, e.target.value)}
+                  title="Pausa till valfritt datum"
+                  style={{ ...inputStyle, width: 'auto', padding: '0.25rem 0.4rem', fontSize: '0.8rem' }}
+                />
+              </>
+            )}
           </div>
-        </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', marginTop: '1rem' }}>
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
+          <label style={labelStyle}>Deluppgifter</label>
+          <div style={{ marginBottom: '0.5rem' }}>
+            {children.length > 1 ? (
+              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleChildDragEnd}>
+                <SortableContext items={children.map((c) => c.id)} strategy={verticalListSortingStrategy}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                    {children.map((child) => (
+                      <ChildRow key={child.id} child={child} parentId={item.id} />
+                    ))}
+                  </div>
+                </SortableContext>
+              </DndContext>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                {children.map((child) => (
+                  <ChildRow key={child.id} child={child} parentId={item.id} />
+                ))}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.4rem' }}>
+              <input
+                value={childInput}
+                onChange={(e) => setChildInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddChild()}
+                placeholder="+ ny deluppgift"
+                style={{ ...inputStyle, flex: 1, fontSize: '0.85rem' }}
+              />
+              <button onClick={handleAddChild} style={secondaryBtn}>Lägg till</button>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1.25rem', paddingTop: '0.75rem', borderTop: `1px solid ${theme.colors.border}` }}>
             <button onClick={handleClone} style={secondaryBtn}>Klona</button>
             <button onClick={handleDelete} style={{ ...secondaryBtn, color: theme.colors.danger, borderColor: theme.colors.danger }}>
               Ta bort
             </button>
           </div>
-          <button onClick={onClose} style={primaryBtn}>Stäng</button>
         </div>
       </div>
     </div>

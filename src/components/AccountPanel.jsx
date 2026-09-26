@@ -59,6 +59,12 @@ Logga ut ändå?`
   // fix: drop every service worker + cache this origin has and hard-reload,
   // guaranteeing the next load fetches the current deployed build. Doesn't
   // touch IndexedDB — no local data is affected.
+  //
+  // Avslutas med en ny navigering till en unik URL istället för
+  // location.reload(): en installerad iOS-PWA kan annars svara från sin
+  // HTTP-cache med samma gamla index.html. Närmaste vi kommer "stäng och
+  // öppna appen igen" inifrån appen — all JS-state (t.ex. en synk som
+  // fastnat) börjar om från noll. ?omstart tas bort igen i main.jsx.
   async function forceUpdate() {
     setUpdating(true)
     try {
@@ -71,7 +77,9 @@ Logga ut ändå?`
         await Promise.all(keys.map((k) => caches.delete(k)))
       }
     } finally {
-      window.location.reload()
+      const url = new URL(window.location.href)
+      url.searchParams.set('omstart', Date.now().toString())
+      window.location.replace(url.toString())
     }
   }
 
@@ -253,7 +261,7 @@ Logga ut ändå?`
 
           <div style={{ borderTop: `1px solid ${theme.colors.border}`, marginTop: '0.75rem', paddingTop: '0.6rem' }}>
             <button onClick={forceUpdate} disabled={updating} style={{ ...miniLinkBtn, color: theme.colors.textMuted }}>
-              {updating ? '🔄 Uppdaterar…' : '🔄 Ser gammalt ut? Tvinga uppdatering'}
+              {updating ? '🔄 Startar om…' : '🔄 Ser gammalt ut? Uppdatera & starta om'}
             </button>
           </div>
         </div>

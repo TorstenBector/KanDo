@@ -28,6 +28,12 @@ export function parseLocalDateISO(iso) {
   return new Date(y, m - 1, d)
 }
 
+// Kort datum för trånga ställen, t.ex. "mån 28 sep" (utan punkterna
+// som sv-SE:s kortformer annars får).
+export function formatShortDate(iso) {
+  return parseLocalDateISO(iso).toLocaleDateString('sv-SE', { weekday: 'short', day: 'numeric', month: 'short' }).replace(/\./g, '')
+}
+
 export function addDaysISO(iso, days) {
   const d = parseLocalDateISO(iso)
   d.setDate(d.getDate() + days)

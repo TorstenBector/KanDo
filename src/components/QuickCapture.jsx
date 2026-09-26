@@ -1,11 +1,12 @@
 import { useState } from 'react'
-import { createItem, scheduleToday, togglePrioritized, toggleShoppingList, addChildItem, setRecurrence, setRecurrenceWeekdays } from '../hooks/useItems'
+import { createItem, scheduleOn, togglePrioritized, toggleShoppingList, addChildItem, setRecurrence, setRecurrenceWeekdays } from '../hooks/useItems'
 import { addItemTag } from '../hooks/useTags'
 import { addAttachment, checkAttachmentAllowed, getAttachmentKind } from '../hooks/useAttachments'
 import FileTile from './FileTile'
 import { useVisualViewportHeight } from '../hooks/useVisualViewportHeight'
 import TagInput from './TagInput'
 import TagCoOccurrenceSuggestions from './TagCoOccurrenceSuggestions'
+import { todayISO, formatShortDate } from '../lib/date'
 import { theme } from '../theme'
 
 const RECURRENCE_PRESETS = [
@@ -31,7 +32,8 @@ export default function QuickCapture() {
   const [description, setDescription] = useState('')
   const [saving, setSaving] = useState(false)
   const [prioritized, setPrioritized] = useState(false)
-  const [scheduledToday, setScheduledToday] = useState(false)
+  // null | 'YYYY-MM-DD' — "+ Dagens Fokus" är bara genvägen till idag
+  const [scheduledDate, setScheduledDate] = useState(null)
   const [shoppingList, setShoppingList] = useState(false)
   const [pendingTags, setPendingTags] = useState([])
   const [pendingAttachments, setPendingAttachments] = useState([]) // { id, file, kind, previewUrl? }
@@ -47,7 +49,7 @@ export default function QuickCapture() {
     setTitle('')
     setDescription('')
     setPrioritized(false)
-    setScheduledToday(false)
+    setScheduledDate(null)
     setShoppingList(false)
     setPendingTags([])
     pendingAttachments.forEach((p) => p.previewUrl && URL.revokeObjectURL(p.previewUrl))
@@ -133,6 +135,8 @@ export default function QuickCapture() {
     setRecurrenceWeekdaysState((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day].sort()))
   }
 
+  const isScheduledToday = scheduledDate === todayISO()
+  const isScheduledLater = !!scheduledDate && !isScheduledToday
   const recurrencePreset = recurrenceWeekdays.length
     ? 'weekdays'
     : ([7, 14].includes(recurrenceDays) ? String(recurrenceDays) : (recurrenceDays ? 'custom' : ''))
@@ -157,7 +161,7 @@ export default function QuickCapture() {
         description: description.trim() || null,
       })
       if (prioritized) await togglePrioritized(item.id)
-      if (scheduledToday) await scheduleToday(item.id)
+      if (scheduledDate) await scheduleOn(item.id, scheduledDate)
       if (shoppingList) await toggleShoppingList(item.id)
       for (const tag of pendingTags) {
         await addItemTag(item.id, tag.id)
@@ -388,8 +392,8 @@ export default function QuickCapture() {
                 <button onClick={() => setPrioritized((v) => !v)} style={prioritized ? pillActive : pill}>
                   {prioritized ? '✓ Prioriterad' : '+ Prioriterad'}
                 </button>
-                <button onClick={() => setScheduledToday((v) => !v)} style={scheduledToday ? pillActive : pill}>
-                  {scheduledToday ? '✓ Dagens Fokus' : '+ Dagens Fokus'}
+                <button onClick={() => setScheduledDate(isScheduledToday ? null : todayISO())} style={isScheduledToday ? pillActive : pill}>
+                  {isScheduledToday ? '✓ Dagens Fokus' : '+ Dagens Fokus'}
                 </button>
                 <button onClick={() => setShoppingList((v) => !v)} style={shoppingList ? pillActive : pill}>
                   {shoppingList ? '✓ Inköpslista' : '+ Inköpslista'}
@@ -403,6 +407,30 @@ export default function QuickCapture() {
                 >
                   {RECURRENCE_PRESETS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
+                {/* Planera till ett senare datum direkt vid skapandet, t.ex.
+                    måndag nästa vecka, utan att gå via Dagens Fokus idag
+                    (KanDo Vibe #6645). Ett genomskinligt datumfält ligger
+                    över knappen: iOS öppnar den inbyggda kalendern vid tryck
+                    och showPicker() täcker desktop-webbläsare. */}
+                <div style={{ position: 'relative', display: 'flex' }}>
+                  <span style={{ ...(isScheduledLater ? pillActive : pill), display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>
+                    {isScheduledLater ? `📅 ${formatShortDate(scheduledDate)}` : '📅 Planerad till'}
+                  </span>
+                  <input
+                    type="date"
+                    min={todayISO()}
+                    value={scheduledDate ?? ''}
+                    onChange={(e) => setScheduledDate(e.target.value || null)}
+                    onClick={(e) => { try { e.currentTarget.showPicker?.() } catch { /* redan öppen / ej stöd */ } }}
+                    aria-label="Planerad till datum"
+                    style={{ position: 'absolute', inset: 0, opacity: 0, width: '100%', height: '100%', cursor: 'pointer', border: 'none', padding: 0 }}
+                  />
+                </div>
+                {isScheduledLater && (
+                  <button onClick={() => setScheduledDate(null)} title="Ta bort planerat datum" style={{ ...pill, padding: '0.3rem 0.6rem' }}>
+                    ✕
+                  </button>
+                )}
                 {customRecurrence && (
                   <input
                     type="number"

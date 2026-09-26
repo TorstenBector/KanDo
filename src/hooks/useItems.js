@@ -129,10 +129,10 @@ export async function reorderPrioritized(orderedIds) {
 // status meant before (e.g. 'prioriterad'), so that's remembered in
 // pre_focus_status and restored by unschedule() below. Already-'planerad'
 // items don't need any of this — nothing to remember, nothing changes.
-export async function scheduleToday(id) {
+export async function scheduleOn(id, dateISO) {
   const item = await db.items.get(id)
   if (!item) return
-  const changes = { scheduled_date: todayISO() }
+  const changes = { scheduled_date: dateISO }
   if (item.status !== 'planerad') {
     changes.pre_focus_status = item.status
     changes.status = 'planerad'
@@ -140,18 +140,15 @@ export async function scheduleToday(id) {
   await updateItem(id, changes)
 }
 
+export function scheduleToday(id) {
+  return scheduleOn(id, todayISO())
+}
+
 // Swipe-right in Dagens Fokus — push a card to tomorrow instead of doing
 // it today, without demoting it back through Backlog like sendToBacklog
-// does. Mirrors scheduleToday exactly, just one day later.
-export async function scheduleTomorrow(id) {
-  const item = await db.items.get(id)
-  if (!item) return
-  const changes = { scheduled_date: addDaysISO(todayISO(), 1) }
-  if (item.status !== 'planerad') {
-    changes.pre_focus_status = item.status
-    changes.status = 'planerad'
-  }
-  await updateItem(id, changes)
+// does. Same as scheduleToday, just one day later.
+export function scheduleTomorrow(id) {
+  return scheduleOn(id, addDaysISO(todayISO(), 1))
 }
 
 export async function unschedule(id) {

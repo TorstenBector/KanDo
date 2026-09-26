@@ -9,7 +9,7 @@ import ItemDetailModal from './ItemDetailModal'
 import TagInput from './TagInput'
 import TagCoOccurrenceSuggestions from './TagCoOccurrenceSuggestions'
 import TriageReview from './TriageReview'
-import { todayISO, parseLocalDateISO } from '../lib/date'
+import { todayISO, formatShortDate } from '../lib/date'
 import { theme } from '../theme'
 
 const TYPE_TABS = [
@@ -20,13 +20,6 @@ const TYPE_TABS = [
 ]
 
 const STATUS_LABEL = { backlog: 'Backlog', prioriterad: 'Prioriterad', planerad: 'Planerad', pagar: 'Pågår', klar: 'Klar' }
-
-// Kort datum för kortets statusrad, t.ex. "mån 28 sep" — hela
-// veckodag+månad (som i Dagens Fokus) tar för mycket plats bredvid
-// typ-väljaren på en mobilskärm.
-function formatShortDate(iso) {
-  return parseLocalDateISO(iso).toLocaleDateString('sv-SE', { weekday: 'short', day: 'numeric', month: 'short' }).replace(/\./g, '')
-}
 
 const PRIORITY_OPTIONS = [
   { value: '', label: 'Ingen prio' },

@@ -65,6 +65,20 @@ export async function createItem({ type, title, original_text = null, descriptio
   return item
 }
 
+// "Behåll i Backlog" i Triage — sänker kortet till botten av Backlog tills
+// något annat ändras på det (KanDo Vibe #7356). Samma tidpunkt i båda
+// fälten: nedsänkt så länge triage_skipped_at >= updated_at, och varje
+// senare updateItem() bumpar updated_at och lyfter tillbaka kortet.
+export async function skipInTriage(id) {
+  const now = new Date().toISOString()
+  await db.items.update(id, { triage_skipped_at: now, updated_at: now, _syncStatus: 'pending' })
+  triggerPush()
+}
+
+export function isTriageSkipped(item) {
+  return !!item.triage_skipped_at && item.triage_skipped_at >= item.updated_at
+}
+
 export async function updateItem(id, changes) {
   await db.items.update(id, {
     ...changes,

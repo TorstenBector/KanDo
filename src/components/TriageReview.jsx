@@ -6,9 +6,9 @@ const SWIPE_THRESHOLD = 90
 
 // The generalized version of Dagens Fokus's "Missade" swipe review — one
 // card at a time, Tinder-style: right promotes to the next stage, left
-// either demotes to the stage before it or (when onReject is null, e.g.
-// Backlog has nowhere lower to go) just skips to the next card without
-// changing anything. Used by Backlog, Prio, and Kanban's Planerad/Pågår
+// demotes to the stage before it (Backlog, with nowhere lower to go, sinks
+// the card to the bottom of the list instead — see skipInTriage), or just
+// skips to the next card when onReject is null. Used by Backlog, Prio, and Kanban's Planerad/Pågår
 // columns — each supplies its own item queue + promote/reject actions.
 export default function TriageReview({
   items, promoteLabel, rejectLabel, onPromote, onReject, onOpenDetail, onClose,
@@ -20,12 +20,12 @@ export default function TriageReview({
   const queue = items.filter((i) => !skipped.has(i.id))
   const item = queue[0]
 
+  // Kortet tas alltid ur den här genomgången lokalt — även när onReject
+  // gör något (Backlog sänker det till botten, vilket annars bara hade
+  // flyttat det sist i samma kö och visat det igen).
   function reject(id) {
-    if (onReject) {
-      onReject(id)
-    } else {
-      setSkipped((prev) => new Set(prev).add(id))
-    }
+    setSkipped((prev) => new Set(prev).add(id))
+    onReject?.(id)
   }
 
   if (!item) {

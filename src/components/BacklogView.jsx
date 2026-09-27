@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
-import { updateItem, deleteItem, markDoneWithConfirm, scheduleToday, unschedule, setRecurrence, togglePrioritized, resumeItem, toggleShoppingList } from '../hooks/useItems'
+import { updateItem, deleteItem, markDoneWithConfirm, scheduleToday, unschedule, setRecurrence, togglePrioritized, resumeItem, toggleShoppingList, skipInTriage, isTriageSkipped } from '../hooks/useItems'
 import { useItemTags, addItemTag } from '../hooks/useTags'
 import { useChildrenByParent } from '../hooks/useRelations'
 import { useEditBuffer } from '../hooks/useEditBuffer'
@@ -67,7 +67,12 @@ export default function BacklogView({ selectedTagIds }) {
   // Paused ("Bibliotek") items stay out of the main list entirely until
   // their date passes — see pauseItem/reactivatePausedItems.
   const today = todayISO()
-  const items = useMemo(() => allItems.filter((i) => !(i.paused_until && i.paused_until > today)), [allItems, today])
+  // Kort man valt "Behåll i Backlog" för i Triage läggs sist (stabil
+  // sortering, så inbördes ordning behålls) tills något ändras på dem.
+  const items = useMemo(() => {
+    const active = allItems.filter((i) => !(i.paused_until && i.paused_until > today))
+    return [...active.filter((i) => !isTriageSkipped(i)), ...active.filter(isTriageSkipped)]
+  }, [allItems, today])
   const pausedItems = useMemo(() => allItems.filter((i) => i.paused_until && i.paused_until > today), [allItems, today])
 
   const visible = useMemo(() => {
@@ -130,11 +135,14 @@ export default function BacklogView({ selectedTagIds }) {
 
       {triageOpen ? (
         <TriageReview
-          items={[...backlogOnly].reverse()}
+          items={[
+            ...backlogOnly.filter((i) => !isTriageSkipped(i)).reverse(),
+            ...backlogOnly.filter(isTriageSkipped).reverse(),
+          ]}
           promoteLabel="→ Prioriterad"
           rejectLabel="Behåll i Backlog"
           onPromote={togglePrioritized}
-          onReject={null}
+          onReject={skipInTriage}
           onOpenDetail={setDetailItemId}
           onClose={() => setTriageOpen(false)}
         />

@@ -9,6 +9,7 @@ import ShoppingListView from './components/ShoppingListView'
 import ShareListManager from './components/ShareListManager'
 import TagManagementView from './components/TagManagementView'
 import SearchView from './components/SearchView'
+import StatistikView from './components/StatistikView'
 import HelpView from './components/HelpView'
 import AccountPanel from './components/AccountPanel'
 import SyncNudgeBanner from './components/SyncNudgeBanner'
@@ -32,6 +33,7 @@ const TABS = [
   { id: 'kanban', label: 'Kanban' },
   { id: 'shopping', label: 'Inköpslista' },
   { id: 'utforda', label: 'Utförda' },
+  { id: 'statistik', label: 'Statistik' },
   { id: 'dela', label: 'Dela' },
   { id: 'taggar', label: 'Tagghantering' },
   { id: 'hjalp', label: 'Hjälp' },
@@ -220,6 +222,7 @@ export default function KandoApp() {
         {tab === 'dela' && <ShareListManager />}
         {tab === 'taggar' && <TagManagementView />}
         {tab === 'sok' && <SearchView selectedTagIds={selectedTagIds} onToggleTag={toggleTag} />}
+        {tab === 'statistik' && <StatistikView />}
         {tab === 'hjalp' && <HelpView />}
       </main>
 

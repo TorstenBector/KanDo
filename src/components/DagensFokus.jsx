@@ -315,6 +315,19 @@ export default function DagensFokus({ selectedTagIds }) {
         </p>
       )}
 
+      {/* Räknare för hela dagen, inte bara per tagg-grupp (KanDo Vibe
+          #7413). Bara för faktiskt schemalagda dagar — "de fem högst
+          prioriterade"-reservlistan är inga Dagens KanDo's att räkna. */}
+      {showScheduled && rawList.length > 0 && (
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', flexWrap: 'wrap', margin: '0 0 0.6rem', fontSize: '0.85rem', color: theme.colors.textMuted }}>
+          <span style={{ fontSize: '1rem', fontWeight: 700, color: theme.colors.text }}>
+            {rawList.length} {rawList.length === 1 ? 'KanDo' : "KanDo's"}
+          </span>
+          <span>· {activeItems.length} kvar</span>
+          <span style={{ color: theme.colors.success, fontWeight: 600 }}>· {doneItems.length} utförda</span>
+        </div>
+      )}
+
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
         {/* Done items float to the top, but collapse into one line past the
             threshold so what's left to do gets the visual space instead. */}

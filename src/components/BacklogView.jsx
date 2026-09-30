@@ -355,12 +355,17 @@ function BacklogItemRow({ item, onOpenDetail, childCount = 0, collapsed = false,
             <span style={{ fontSize: '0.7rem', color: theme.colors.textMuted }}>· {STATUS_LABEL[item.status] ?? item.status}</span>
             {/* Planerat datum direkt på kortet, så man slipper klicka in för
                 att se om en KanDo redan är schemalagd (KanDo Vibe #6761).
-                Idag syns redan via "✓ I Dagens Fokus"-knappen nedan. */}
+                Idag syns redan via "✓ I Dagens Fokus"-knappen nedan. Ifylld
+                pill i samma färg som den knappen, så att schemalagda kort syns
+                lika tydligt i Backlog som de i Dagens Fokus (KanDo Vibe #7890). */}
             {item.scheduled_date && !isScheduledToday && (
               <span style={{
                 fontSize: '0.7rem',
                 fontWeight: 600,
-                color: item.scheduled_date < todayISO() ? theme.colors.warning : theme.colors.primary,
+                background: item.scheduled_date < todayISO() ? theme.colors.warning : theme.colors.primary,
+                color: item.scheduled_date < todayISO() ? theme.colors.text : theme.colors.textOnPrimary,
+                borderRadius: '999px',
+                padding: '0.05rem 0.45rem',
                 whiteSpace: 'nowrap',
               }}>
                 📅 {formatShortDate(item.scheduled_date)}

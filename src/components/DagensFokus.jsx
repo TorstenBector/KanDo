@@ -5,16 +5,26 @@ import { markDoneWithConfirm, reopenItem, sendToBacklog, scheduleToday, schedule
 import { useChildrenByParent } from '../hooks/useRelations'
 import { sortTagsByOrder } from '../hooks/useTags'
 import { todayISO, addDaysISO, parseLocalDateISO } from '../lib/date'
+import { byPriorityThenRank } from '../lib/priority'
+import WeekView from './WeekView'
 import ItemDetailModal from './ItemDetailModal'
 import { theme } from '../theme'
 
 const TYPE_LABEL = { idea: 'Idé', project: 'Projekt', task: 'Task' }
 const COLLAPSE_THRESHOLD = 3
-const PRIORITY_WEIGHT = { hog: 0, medel: 1, lag: 2 }
 // Per enhet (localStorage), inte synkat via Supabase — KanDo Vibe #4318
 // bad om att appen kommer ihåg senaste "Gruppera efter tagg"-läget istället
 // för att alltid starta om från av.
 const GROUP_BY_TAG_STORAGE_KEY = 'kando-dagensfokus-groupByTag'
+// Dag/Vecka-växeln (KanDo Vibe #7898) — också per enhet, samma skäl.
+const VIEW_MODE_STORAGE_KEY = 'kando-dagensfokus-viewMode'
+function loadViewModeDefault() {
+  try {
+    return localStorage.getItem(VIEW_MODE_STORAGE_KEY) === 'vecka' ? 'vecka' : 'dag'
+  } catch {
+    return 'dag'
+  }
+}
 function loadGroupByTagDefault() {
   try {
     return localStorage.getItem(GROUP_BY_TAG_STORAGE_KEY) === 'true'
@@ -29,15 +39,6 @@ function formatDateLabel(iso) {
   return label.charAt(0).toUpperCase() + label.slice(1)
 }
 
-// Default order: backlog_priority (Hög/Medel/Låg) first, then position in
-// the Prio list within each tier — a composite of both attributes rather
-// than either alone.
-function byPriorityThenRank(a, b) {
-  const aWeight = a.backlog_priority ? PRIORITY_WEIGHT[a.backlog_priority] : 3
-  const bWeight = b.backlog_priority ? PRIORITY_WEIGHT[b.backlog_priority] : 3
-  if (aWeight !== bWeight) return aWeight - bWeight
-  return (a.priority_rank ?? 999999) - (b.priority_rank ?? 999999)
-}
 
 export default function DagensFokus({ selectedTagIds }) {
   const [showDone, setShowDone] = useState(false)
@@ -45,6 +46,11 @@ export default function DagensFokus({ selectedTagIds }) {
   const [selectedDate, setSelectedDate] = useState(todayISO())
   const [groupByTag, setGroupByTag] = useState(loadGroupByTagDefault)
   const [reviewMode, setReviewMode] = useState(false)
+  const [viewMode, setViewModeState] = useState(loadViewModeDefault)
+  const setViewMode = (mode) => {
+    setViewModeState(mode)
+    try { localStorage.setItem(VIEW_MODE_STORAGE_KEY, mode) } catch { /* private mode etc — just don't persist */ }
+  }
   // Which non-today date the floating "gå till idag"-nudge was dismissed
   // for — reset (nudge reappears) the moment you navigate to a DIFFERENT
   // date, so dismissing once doesn't silently suppress it forever if you
@@ -178,6 +184,43 @@ export default function DagensFokus({ selectedTagIds }) {
     [allMissed, selectedTagIds, taggedItemIds]
   )
 
+  const viewToggle = (
+    <div style={segWrap}>
+      {[['dag', 'Dag'], ['vecka', 'Vecka']].map(([mode, label]) => (
+        <button
+          key={mode}
+          onClick={() => setViewMode(mode)}
+          aria-pressed={viewMode === mode}
+          style={{
+            ...segBtn,
+            background: viewMode === mode ? theme.colors.primary : 'transparent',
+            color: viewMode === mode ? theme.colors.textOnPrimary : theme.colors.primary,
+          }}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  )
+
+  if (viewMode === 'vecka') {
+    return (
+      <div style={{ padding: '1rem' }}>
+        <WeekView
+          selectedTagIds={selectedTagIds}
+          viewToggle={viewToggle}
+          onOpenDetail={setDetailItemId}
+          onOpenDay={(dateISO) => {
+            setSelectedDate(dateISO)
+            setReviewMode(false)
+            setViewMode('dag')
+          }}
+        />
+        <ItemDetailModal itemId={detailItemId} onClose={() => setDetailItemId(null)} />
+      </div>
+    )
+  }
+
   return (
     <div style={{ padding: '1rem' }}>
       {/* En wrappande rad med två grupper: datumnavigering till vänster,
@@ -187,6 +230,7 @@ export default function DagensFokus({ selectedTagIds }) {
           till nästa rad, så "🔁 Missade" aldrig hamnar utanför viewport
           (KanDo Vibe #3121). */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem 0.5rem', flexWrap: 'wrap', margin: '0 0 0.5rem' }}>
+        {viewToggle}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
           <button onClick={() => setSelectedDate(addDaysISO(selectedDate, -1))} style={dateNavBtn}>‹</button>
           <span style={{ color: theme.colors.text, fontSize: '0.9rem', fontWeight: 600, minWidth: '8rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
@@ -815,6 +859,22 @@ const ctaBtn = {
   fontWeight: 700,
   cursor: 'pointer',
   boxShadow: theme.shadow.sm,
+}
+
+const segWrap = {
+  display: 'inline-flex',
+  border: `1px solid ${theme.colors.primary}`,
+  borderRadius: '999px',
+  overflow: 'hidden',
+  flexShrink: 0,
+}
+
+const segBtn = {
+  border: 'none',
+  padding: '0.3rem 0.75rem',
+  fontSize: '0.8rem',
+  fontWeight: 700,
+  cursor: 'pointer',
 }
 
 const dateNavBtn = {

@@ -15,6 +15,7 @@ export const theme = {
     success:       '#34C759',
     danger:        '#CC3333',
     warning:       '#E8A020',
+    warningSoft:   '#F6E2B8', // missade kort i veckovyn
     // Subtask/child cards — deliberately its own hue (warm wheat, not
     // green or gold) so a nested child never reads as "done" or
     // "high priority" by accident. See spec discussion on child card styling.

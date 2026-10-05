@@ -79,8 +79,13 @@ function nextDirty(item, keys) {
 }
 
 async function writeItemChanges(id, changes) {
-  const keys = Object.keys(changes).filter((k) => !k.startsWith('_') && k !== 'updated_at')
   await db.items.where('id').equals(id).modify((item) => {
+    // Varje annan ändring lyfter tillbaka ett kort som sänkts med "Behåll i
+    // Backlog" — genom att nolla fältet uttryckligen (se skipInTriage).
+    if (item.triage_skipped_at && !('triage_skipped_at' in changes)) {
+      changes = { ...changes, triage_skipped_at: null }
+    }
+    const keys = Object.keys(changes).filter((k) => !k.startsWith('_') && k !== 'updated_at')
     const dirty = nextDirty(item, keys)
     Object.assign(item, changes)
     item.updated_at = changes.updated_at ?? new Date().toISOString()
@@ -90,17 +95,26 @@ async function writeItemChanges(id, changes) {
 }
 
 // "Behåll i Backlog" i Triage — sänker kortet till botten av Backlog tills
-// något annat ändras på det (KanDo Vibe #7356). Samma tidpunkt i båda
-// fälten: nedsänkt så länge triage_skipped_at >= updated_at, och varje
-// senare updateItem() bumpar updated_at och lyfter tillbaka kortet.
+// något annat ändras på det (KanDo Vibe #7356). Nedsänkt så länge
+// triage_skipped_at är satt; writeItemChanges nollar det vid varje annan
+// ändring. Förut jämfördes det mot updated_at, men databasens trigger
+// (items_set_updated_at) sätter alltid ett senare updated_at när ändringen
+// når servern — så kortet lyftes tillbaka vid nästa synk.
 export async function skipInTriage(id) {
-  const now = new Date().toISOString()
-  await writeItemChanges(id, { triage_skipped_at: now, updated_at: now })
+  await writeItemChanges(id, { triage_skipped_at: new Date().toISOString() })
   triggerPush()
 }
 
+// Marginalen täcker triggerns egen bump när ändringen synkas (sekunder).
+// Ligger updated_at längre efter än så har kortet ändrats av något som inte
+// gick via writeItemChanges — t.ex. gamla värden från före den här
+// ändringen, eller en äldre app-version på en annan enhet — och då räknas
+// det som lyft, precis som tidigare tänkt.
+const TRIAGE_SKIP_SYNC_MARGIN_MS = 10 * 60 * 1000
+
 export function isTriageSkipped(item) {
-  return !!item.triage_skipped_at && item.triage_skipped_at >= item.updated_at
+  if (!item.triage_skipped_at) return false
+  return new Date(item.updated_at) - new Date(item.triage_skipped_at) <= TRIAGE_SKIP_SYNC_MARGIN_MS
 }
 
 export async function updateItem(id, changes) {

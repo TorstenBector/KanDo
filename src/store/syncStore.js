@@ -39,7 +39,9 @@ export const useSyncStore = create((set, get) => ({
     set({ session: data.session })
     if (data.session) {
       await claimLocalData(data.session.user.id)
-      get().sync()
+      // Väntas in: KandoApp kör sina lokala reparationer (återkommande,
+      // pausade kort) först när serverns läge är hämtat — se boot().
+      await get().sync()
     }
 
     supabase.auth.onAuthStateChange(async (_event, session) => {

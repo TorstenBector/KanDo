@@ -34,15 +34,41 @@ export async function pushPendingChanges(userId) {
     // value now (BY DEFAULT, not ALWAYS), but there's no reason for the
     // client to ever send one; stripping it here is the client's half of
     // keeping that field truly read-only from its side.
-    const { _syncStatus, short_id, ...row } = item
-    const { error } = await supabase.from('items').upsert({ ...row, user_id: userId })
+    const { _syncStatus, _dirty, short_id, ...row } = item
+    let serverRow = null
+    let error = null
+    if (Array.isArray(_dirty)) {
+      // Bara de fält som ändrats lokalt (se writeItemChanges i useItems.js)
+      // — annars skriver en inaktuell enhet tillbaka t.ex. gammal status
+      // över ett kort som klarmarkerats på en annan enhet.
+      const fields = Object.fromEntries(_dirty.map((k) => [k, row[k] ?? null]))
+      const res = await supabase.from('items').update(fields).eq('id', item.id).select()
+      error = res.error
+      serverRow = res.data?.[0] ?? null
+      // 0 rader = finns inte på servern (t.ex. raderad på en annan enhet) —
+      // samma beteende som tidigare: skicka hela raden.
+      if (!error && !serverRow) error = (await supabase.from('items').upsert({ ...row, user_id: userId })).error
+    } else {
+      error = (await supabase.from('items').upsert({ ...row, user_id: userId })).error
+    }
     if (error) {
       // Don't let one bad row block every other pending item in the batch —
       // skip it (stays 'pending', retried next sync) and keep going.
       itemErrors.push(`"${item.title}": ${error.message}`)
       continue
     }
-    await db.items.update(item.id, { _syncStatus: 'synced' })
+    // Ändrades kortet lokalt igen medan push pågick ligger det kvar som
+    // väntande (med alla fält i _dirty) och skickas nästa varv.
+    const current = await db.items.get(item.id)
+    if (!current || current.updated_at !== item.updated_at) continue
+    if (serverRow) {
+      // Serverns rad har övriga fält aktuella (t.ex. klarmarkering från en
+      // annan enhet) — ta in dem lokalt direkt. Lokal updated_at behålls,
+      // samma tidslinje som förut tills nästa pull.
+      await db.items.put({ ...serverRow, updated_at: current.updated_at, _syncStatus: 'synced' })
+    } else {
+      await db.items.update(item.id, { _syncStatus: 'synced', _dirty: null })
+    }
   }
 
   // Tags used to be pushed as "upsert every local tag every cycle" —
@@ -164,7 +190,14 @@ export async function pullRemoteChanges(userId) {
   if (itemsErr) pullErrors.push(`KanDo's: ${itemsErr.message}`)
   for (const remote of remoteItems ?? []) {
     const local = await db.items.get(remote.id)
-    if (!local || new Date(remote.updated_at) > new Date(local.updated_at)) {
+    if (local?._syncStatus === 'pending' && Array.isArray(local._dirty)) {
+      // Väntande fältändringar: serverns rad som grund, de lokalt ändrade
+      // fälten ovanpå — så resten av kortet (t.ex. status) blir aktuellt
+      // även innan push gått igenom, och inget lokalt försvinner.
+      const overlay = Object.fromEntries(local._dirty.map((k) => [k, local[k]]))
+      const updated_at = new Date(remote.updated_at) > new Date(local.updated_at) ? remote.updated_at : local.updated_at
+      await db.items.put({ ...remote, ...overlay, updated_at, _dirty: local._dirty, _syncStatus: 'pending' })
+    } else if (!local || new Date(remote.updated_at) > new Date(local.updated_at)) {
       await db.items.put({ ...remote, _syncStatus: 'synced' })
     } else if (local.short_id == null && remote.short_id != null) {
       // short_id is assigned by Postgres the moment an item first reaches

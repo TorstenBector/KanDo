@@ -93,7 +93,9 @@ export default function WeekView({ selectedTagIds, viewToggle, onOpenDetail, onO
   const moveTo = async (dateISO, id = selectedId) => {
     if (!id) return
     const item = items.find((i) => i.id === id)
-    if (item && item.scheduled_date !== dateISO) await scheduleOn(id, dateISO)
+    // Klara kort flyttas inte — scheduleOn() sätter status 'planerad', vilket
+    // tyst hade öppnat det klara kortet igen.
+    if (item && item.status !== 'klar' && item.scheduled_date !== dateISO) await scheduleOn(id, dateISO)
     clearSelection()
   }
 
@@ -225,7 +227,9 @@ export default function WeekView({ selectedTagIds, viewToggle, onOpenDetail, onO
             <button onClick={() => setMoving(false)} style={barBtn}>Avbryt</button>
           ) : (
             <>
-              <button onClick={() => setMoving(true)} style={barBtn}>Flytta</button>
+              {selectedItem.status !== 'klar' && (
+                <button onClick={() => setMoving(true)} style={barBtn}>Flytta</button>
+              )}
               <button onClick={() => { onOpenDetail(selectedItem.id); clearSelection() }} style={barBtn}>Öppna</button>
               <button onClick={clearSelection} style={{ ...barBtn, border: 'none' }} aria-label="Stäng">✕</button>
             </>

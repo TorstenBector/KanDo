@@ -69,14 +69,17 @@ export default function KandoApp() {
   const mobileLook = storedMobileLook && !isNarrowViewport
 
   useEffect(() => {
-    // Local data repairs run before the first sync attempt, so a stale
-    // record doesn't get pushed and rejected before it's been fixed.
+    // Lokala reparationer körs EFTER första synken. Förut körde de före, på
+    // en enhet som kanske inte synkat på dagar — då kunde t.ex. ett
+    // återkommande kort som redan klarmarkerats på mobilen återaktiveras
+    // från datorns gamla kopia och skickas upp som ej klart. initSync()
+    // väntar in första synken (eller returnerar direkt om utloggad).
     async function boot() {
+      await initSync()
       await migrateLegacyItemStatus()
       await reactivateDueRecurringItems()
       await reactivatePausedItems()
       await seedDefaultStaplesIfEmpty()
-      initSync()
     }
     boot()
   }, [initSync])

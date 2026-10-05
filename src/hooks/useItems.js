@@ -65,13 +65,37 @@ export async function createItem({ type, title, original_text = null, descriptio
   return item
 }
 
+// Fältnivå-synk: varje lokal ändring antecknar VILKA fält som ändrats i
+// _dirty, och push skickar bara de fälten (se pushPendingChanges). Förut
+// skickades hela den lokala raden — en enhet som inte synkat på ett tag
+// (datorn, en gammal flik) skrev då tillbaka sin inaktuella status på kort
+// som klarmarkerats på mobilen, så fort den ändrade något annat på dem
+// (t.ex. sorterade om Prio). _dirty saknas/null på en väntande rad = hela
+// raden är ny (createItem, claimLocalData) och skickas i sin helhet.
+function nextDirty(item, keys) {
+  if (item._syncStatus === 'pending' && !Array.isArray(item._dirty)) return null
+  const base = item._syncStatus === 'pending' ? item._dirty : []
+  return [...new Set([...base, ...keys])]
+}
+
+async function writeItemChanges(id, changes) {
+  const keys = Object.keys(changes).filter((k) => !k.startsWith('_') && k !== 'updated_at')
+  await db.items.where('id').equals(id).modify((item) => {
+    const dirty = nextDirty(item, keys)
+    Object.assign(item, changes)
+    item.updated_at = changes.updated_at ?? new Date().toISOString()
+    item._syncStatus = 'pending'
+    item._dirty = dirty
+  })
+}
+
 // "Behåll i Backlog" i Triage — sänker kortet till botten av Backlog tills
 // något annat ändras på det (KanDo Vibe #7356). Samma tidpunkt i båda
 // fälten: nedsänkt så länge triage_skipped_at >= updated_at, och varje
 // senare updateItem() bumpar updated_at och lyfter tillbaka kortet.
 export async function skipInTriage(id) {
   const now = new Date().toISOString()
-  await db.items.update(id, { triage_skipped_at: now, updated_at: now, _syncStatus: 'pending' })
+  await writeItemChanges(id, { triage_skipped_at: now, updated_at: now })
   triggerPush()
 }
 
@@ -80,11 +104,7 @@ export function isTriageSkipped(item) {
 }
 
 export async function updateItem(id, changes) {
-  await db.items.update(id, {
-    ...changes,
-    updated_at: new Date().toISOString(),
-    _syncStatus: 'pending',
-  })
+  await writeItemChanges(id, changes)
   triggerPush()
 }
 
@@ -127,11 +147,7 @@ export async function deleteItem(id) {
 export async function reorderPrioritized(orderedIds) {
   await db.transaction('rw', db.items, async () => {
     for (let i = 0; i < orderedIds.length; i++) {
-      await db.items.update(orderedIds[i], {
-        priority_rank: i,
-        updated_at: new Date().toISOString(),
-        _syncStatus: 'pending',
-      })
+      await writeItemChanges(orderedIds[i], { priority_rank: i })
     }
   })
   triggerPush()

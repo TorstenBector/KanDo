@@ -23,6 +23,7 @@ import { TagChip, PlannedDatePill, pill, pillActive } from './CaptureControls'
 import TagInput from './TagInput'
 import TagCoOccurrenceSuggestions from './TagCoOccurrenceSuggestions'
 import { theme } from '../theme'
+import { downloadReminderIcs } from '../lib/ics'
 
 const TYPE_LABEL = { idea: 'Idé', project: 'Projekt', task: 'Task' }
 const PRIORITY_OPTIONS = [
@@ -64,6 +65,8 @@ export default function ItemDetailModal({ itemId, onClose }) {
   const [childInput, setChildInput] = useState('')
   const [customRecurrence, setCustomRecurrence] = useState(false)
   const [showWeekdays, setShowWeekdays] = useState(false)
+  // ⏰ Påminn mig (Vibe #8293): null = stängd, annars { date, time }.
+  const [reminder, setReminder] = useState(null)
   const [uploading, setUploading] = useState(false)
   const [lightboxImage, setLightboxImage] = useState(null)
   const [textPreview, setTextPreview] = useState(null) // { filename, content }
@@ -421,7 +424,44 @@ export default function ItemDetailModal({ itemId, onClose }) {
             <button onClick={() => toggleShoppingList(item.id)} style={item.in_shopping_list ? pillActive : pill}>
               {item.in_shopping_list ? '✓ Inköpslista' : '+ Inköpslista'}
             </button>
+            <button
+              onClick={() => setReminder(reminder ? null : { date: item.scheduled_date ?? todayISO(), time: nextHalfHour() })}
+              style={reminder ? pillActive : pill}
+            >
+              ⏰ Påminn mig
+            </button>
           </div>
+          {reminder && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', marginBottom: '0.5rem' }}>
+              <input
+                type="date"
+                value={reminder.date}
+                onChange={(e) => setReminder({ ...reminder, date: e.target.value })}
+                aria-label="Påminnelsens datum"
+                style={inputStyle}
+              />
+              <input
+                type="time"
+                value={reminder.time}
+                onChange={(e) => setReminder({ ...reminder, time: e.target.value })}
+                aria-label="Påminnelsens tid"
+                style={inputStyle}
+              />
+              <button
+                disabled={!reminder.date || !reminder.time}
+                onClick={() => {
+                  downloadReminderIcs({ title: item.title, description: item.description, dateISO: reminder.date, time: reminder.time })
+                  setReminder(null)
+                }}
+                style={primaryBtn}
+              >
+                Lägg i kalendern
+              </button>
+              <span style={{ fontSize: '0.75rem', color: theme.colors.textMuted, width: '100%' }}>
+                Öppnas i telefonens kalender med ett larm på tiden. Ljud och vibration följer kalenderns inställningar.
+              </span>
+            </div>
+          )}
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.5rem' }}>
             <select
               value={recurrencePreset}
@@ -672,6 +712,13 @@ function ChildRow({ child, parentId }) {
       </button>
     </div>
   )
+}
+
+// Förval för påminnelsens tid: nästa hel- eller halvtimme.
+function nextHalfHour() {
+  const d = new Date()
+  d.setMinutes(d.getMinutes() < 30 ? 30 : 60, 0, 0)
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
 const labelStyle = {

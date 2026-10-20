@@ -34,7 +34,7 @@ export async function pushPendingChanges(userId) {
     // value now (BY DEFAULT, not ALWAYS), but there's no reason for the
     // client to ever send one; stripping it here is the client's half of
     // keeping that field truly read-only from its side.
-    const { _syncStatus, _dirty, short_id, ...row } = item
+    const { _syncStatus, _dirty, short_id: _shortId, ...row } = item
     let serverRow = null
     let error = null
     if (Array.isArray(_dirty)) {

@@ -8,6 +8,7 @@ import { useChildrenByParent } from '../hooks/useRelations'
 import KanbanColumn from './KanbanColumn'
 import ItemDetailModal from './ItemDetailModal'
 import TriageReview from './TriageReview'
+import { EMPTY_ARRAY } from '../lib/empty'
 
 // One entry per column that offers a triage swipe-review — Prioriterad and
 // Klar are reached from Prio's own triage / the ordinary checkmark
@@ -46,8 +47,8 @@ function clampToOneStep(originStatus, destStatus) {
 export default function KanbanBoard({ selectedTagIds }) {
   const [detailItemId, setDetailItemId] = useState(null)
   const [triageStage, setTriageStage] = useState(null) // null | 'planerad' | 'pagar'
-  const items = useLiveQuery(() => db.items.toArray(), []) ?? []
-  const itemTagLinks = useLiveQuery(() => db.item_tags.toArray(), []) ?? []
+  const items = useLiveQuery(() => db.items.toArray(), []) ?? EMPTY_ARRAY
+  const itemTagLinks = useLiveQuery(() => db.item_tags.toArray(), []) ?? EMPTY_ARRAY
   const { childIdSet } = useChildrenByParent()
 
   const tagIdsByItemId = useMemo(() => {

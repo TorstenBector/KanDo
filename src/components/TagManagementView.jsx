@@ -5,13 +5,14 @@ import { CSS } from '@dnd-kit/utilities'
 import { useTags, useTagUsageCounts, renameTag, setTagKind, deleteTagEverywhere, mergeTags, sortTagsByOrder, reorderTags, setTagParent } from '../hooks/useTags'
 import TagItemsModal from './TagItemsModal'
 import { theme } from '../theme'
+import { EMPTY_ARRAY } from '../lib/empty'
 
 // "Work" and "Jobb" ended up as two separate chips purely because of which
 // button got clicked when each was created — this is where that gets fixed
 // after the fact: rename, reclassify (🏷/📍), merge duplicates, or delete
 // an unused tag. See useTags.js for the underlying operations.
 export default function TagManagementView() {
-  const allTags = useTags() ?? []
+  const allTags = useTags() ?? EMPTY_ARRAY
   const usageCounts = useTagUsageCounts()
   const [selected, setSelected] = useState(() => new Set())
   const [editingId, setEditingId] = useState(null)
@@ -46,7 +47,8 @@ export default function TagManagementView() {
   function toggleSelected(id) {
     setSelected((prev) => {
       const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
       return next
     })
   }

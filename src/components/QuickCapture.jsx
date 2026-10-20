@@ -7,7 +7,8 @@ import { useVisualViewport, isKeyboardOpen, useBodyScrollLock } from '../hooks/u
 import TagInput from './TagInput'
 import TagCoOccurrenceSuggestions from './TagCoOccurrenceSuggestions'
 import { todayISO } from '../lib/date'
-import { TagChip, PlannedDatePill, pill, pillActive } from './CaptureControls'
+import { TagChip, PlannedDatePill } from './CaptureControls'
+import { pill, pillActive } from './captureStyles'
 import { theme } from '../theme'
 
 const RECURRENCE_PRESETS = [

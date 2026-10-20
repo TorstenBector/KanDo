@@ -6,7 +6,7 @@ import SharedListPage from './components/SharedListPage'
 // including local dev) is the actual app. See spec.md "Plattform".
 const MARKETING_HOSTNAMES = ['kando.nu', 'www.kando.nu']
 
-export function isMarketingHost(hostname) {
+function isMarketingHost(hostname) {
   return MARKETING_HOSTNAMES.includes(hostname)
 }
 

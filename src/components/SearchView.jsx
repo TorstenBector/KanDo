@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
 import ItemDetailModal from './ItemDetailModal'
 import { theme } from '../theme'
+import { EMPTY_ARRAY } from '../lib/empty'
 
 const TYPE_LABEL = { idea: 'Idé', project: 'Projekt', task: 'Task' }
 const STATUS_LABEL = { backlog: 'Backlog', prioriterad: 'Prioriterad', planerad: 'Planerad', pagar: 'Pågår', klar: 'Klar' }
@@ -24,7 +25,7 @@ export default function SearchView({ selectedTagIds, onToggleTag }) {
   const [statusFilter, setStatusFilter] = useState(() => new Set())
   const [attachmentFilter, setAttachmentFilter] = useState('all')
   const [detailItemId, setDetailItemId] = useState(null)
-  const allItems = useLiveQuery(() => db.items.toArray(), []) ?? []
+  const allItems = useLiveQuery(() => db.items.toArray(), []) ?? EMPTY_ARRAY
   const tagsByItem = useLiveQuery(async () => {
     const [links, tags] = await Promise.all([db.item_tags.toArray(), db.tags.toArray()])
     const tagById = new Map(tags.map((t) => [t.id, t]))

@@ -9,6 +9,7 @@ import { useChildrenByParent } from '../hooks/useRelations'
 import ItemDetailModal from './ItemDetailModal'
 import TriageReview from './TriageReview'
 import { theme } from '../theme'
+import { EMPTY_ARRAY } from '../lib/empty'
 
 const TYPE_LABEL = { idea: 'Idé', project: 'Projekt', task: 'Task' }
 
@@ -21,7 +22,8 @@ export default function PrioListView({ selectedTagIds }) {
   const toggleParent = (id) =>
     setExpandedParents((prev) => {
       const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
       return next
     })
   const { childrenByParent, childIdSet } = useChildrenByParent()
@@ -33,7 +35,7 @@ export default function PrioListView({ selectedTagIds }) {
   const allItems = useLiveQuery(async () => {
     const all = await db.items.where('status').equals('prioriterad').toArray()
     return all.sort((a, b) => (a.priority_rank ?? 999999) - (b.priority_rank ?? 999999))
-  }, []) ?? []
+  }, []) ?? EMPTY_ARRAY
 
   // Children are presented grouped under their parent, not as independently
   // draggable rows — see spec discussion: "presenteras ihop i Backlog och Prio".

@@ -11,6 +11,7 @@ import TagCoOccurrenceSuggestions from './TagCoOccurrenceSuggestions'
 import TriageReview from './TriageReview'
 import { todayISO, formatShortDate } from '../lib/date'
 import { theme } from '../theme'
+import { EMPTY_ARRAY } from '../lib/empty'
 
 const TYPE_TABS = [
   { id: 'all', label: 'Alla' },
@@ -46,7 +47,8 @@ export default function BacklogView({ selectedTagIds }) {
   const toggleParent = (id) =>
     setExpandedParents((prev) => {
       const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
       return next
     })
   const { childrenByParent, childIdSet } = useChildrenByParent()
@@ -62,7 +64,7 @@ export default function BacklogView({ selectedTagIds }) {
       return all.filter((i) => i.status !== 'klar')
     },
     []
-  ) ?? []
+  ) ?? EMPTY_ARRAY
 
   // Paused ("Bibliotek") items stay out of the main list entirely until
   // their date passes — see pauseItem/reactivatePausedItems.

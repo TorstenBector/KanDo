@@ -1,26 +1,10 @@
 import { todayISO, formatShortDate } from '../lib/date'
 import { theme } from '../theme'
+import { pill, pillActive } from './captureStyles'
 
 // Kontroller som delas av Snabbfånga (QuickCapture) och kortets editläge
 // (ItemDetailModal), så båda har samma utseende och logiska upplägg
 // (KanDo Vibe #6267).
-
-export const pill = {
-  fontSize: '0.8rem',
-  border: `1px solid ${theme.colors.border}`,
-  borderRadius: '999px',
-  padding: '0.3rem 0.7rem',
-  background: 'transparent',
-  color: theme.colors.textMuted,
-  cursor: 'pointer',
-}
-
-export const pillActive = {
-  ...pill,
-  border: `1px solid ${theme.colors.primary}`,
-  background: theme.colors.primary,
-  color: theme.colors.textOnPrimary,
-}
 
 export function TagChip({ tag, onRemove }) {
   const isContext = tag.kind === 'context'

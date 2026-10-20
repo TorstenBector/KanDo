@@ -5,6 +5,7 @@ import { markDoneWithConfirm, reopenItem, scheduleOn } from '../hooks/useItems'
 import { todayISO, addDaysISO, parseLocalDateISO, toLocalDateISO } from '../lib/date'
 import { byPriorityThenRank } from '../lib/priority'
 import { theme } from '../theme'
+import { EMPTY_ARRAY } from '../lib/empty'
 
 // Veckovy i Dagens Fokus (KanDo Vibe #7898): "vilka kort ligger mot vilken
 // dag", en vecka i taget, utan klockslag. Bygger helt på scheduled_date —
@@ -64,7 +65,7 @@ export default function WeekView({ selectedTagIds, viewToggle, onOpenDetail, onO
   const items = useLiveQuery(
     () => db.items.where('scheduled_date').between(weekStart, weekEnd, true, true).toArray(),
     [weekStart, weekEnd]
-  ) ?? []
+  ) ?? EMPTY_ARRAY
 
   const taggedItemIds = useLiveQuery(async () => {
     if (!selectedTagIds || selectedTagIds.size === 0) return null
@@ -265,7 +266,7 @@ function WeekCard({ item, missed, selected, draggable, onSelect }) {
       }}
     >
       <button
-        onClick={(e) => { e.stopPropagation(); done ? reopenItem(item.id) : markDoneWithConfirm(item.id) }}
+        onClick={(e) => { e.stopPropagation(); if (done) reopenItem(item.id); else markDoneWithConfirm(item.id) }}
         title={done ? 'Ångra' : 'Markera som klar'}
         style={{
           border: `1.5px solid ${theme.colors.success}`,

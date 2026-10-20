@@ -19,13 +19,13 @@ import FileTile from './FileTile'
 import { useEditBuffer } from '../hooks/useEditBuffer'
 import { addMonthsISO, todayISO } from '../lib/date'
 import { useVisualViewport, isKeyboardOpen, useBodyScrollLock } from '../hooks/useVisualViewport'
-import { TagChip, PlannedDatePill, pill, pillActive } from './CaptureControls'
+import { TagChip, PlannedDatePill } from './CaptureControls'
+import { pill, pillActive } from './captureStyles'
 import TagInput from './TagInput'
 import TagCoOccurrenceSuggestions from './TagCoOccurrenceSuggestions'
 import { theme } from '../theme'
 import { downloadReminderIcs } from '../lib/ics'
 
-const TYPE_LABEL = { idea: 'Idé', project: 'Projekt', task: 'Task' }
 const PRIORITY_OPTIONS = [
   { value: '', label: 'Ingen prio' },
   { value: 'hog', label: 'Hög' },

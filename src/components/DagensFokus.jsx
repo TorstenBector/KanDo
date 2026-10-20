@@ -9,6 +9,7 @@ import { byPriorityThenRank } from '../lib/priority'
 import WeekView from './WeekView'
 import ItemDetailModal from './ItemDetailModal'
 import { theme } from '../theme'
+import { EMPTY_ARRAY } from '../lib/empty'
 
 const TYPE_LABEL = { idea: 'Idé', project: 'Projekt', task: 'Task' }
 const COLLAPSE_THRESHOLD = 3
@@ -70,7 +71,8 @@ export default function DagensFokus({ selectedTagIds }) {
   const toggleParent = (id) =>
     setExpandedParents((prev) => {
       const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
       return next
     })
   const { childrenByParent } = useChildrenByParent()
@@ -91,7 +93,7 @@ export default function DagensFokus({ selectedTagIds }) {
   }, [isToday])
 
   const showScheduled = (scheduled?.length ?? 0) > 0
-  const unfilteredList = showScheduled ? scheduled : (topPriority ?? [])
+  const unfilteredList = showScheduled ? scheduled : (topPriority ?? EMPTY_ARRAY)
 
   const taggedItemIds = useLiveQuery(async () => {
     if (!selectedTagIds || selectedTagIds.size === 0) return null
@@ -178,7 +180,7 @@ export default function DagensFokus({ selectedTagIds }) {
   const allMissed = useLiveQuery(async () => {
     const all = await db.items.where('scheduled_date').below(today).toArray()
     return all.filter((i) => i.status !== 'klar').sort((a, b) => a.scheduled_date.localeCompare(b.scheduled_date))
-  }, [today]) ?? []
+  }, [today]) ?? EMPTY_ARRAY
   const missedItems = useMemo(
     () => (selectedTagIds?.size > 0 && taggedItemIds ? allMissed.filter((i) => taggedItemIds.has(i.id)) : allMissed),
     [allMissed, selectedTagIds, taggedItemIds]

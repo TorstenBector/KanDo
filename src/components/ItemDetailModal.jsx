@@ -349,6 +349,19 @@ export default function ItemDetailModal({ itemId, onClose }) {
             <TagCoOccurrenceSuggestions appliedTagIds={appliedTagIds} onAdd={(tag) => addItemTag(item.id, tag.id)} />
           </div>
 
+          {/* Snabbval ovanför Beskrivning, samma ordning som Snabbfånga (KanDo Vibe #8408). */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.85rem' }}>
+            <button onClick={() => togglePrioritized(item.id)} style={item.status === 'prioriterad' ? pillActive : pill}>
+              {item.status === 'prioriterad' ? '✓ Prioriterad' : '+ Prioriterad'}
+            </button>
+            <button onClick={() => (isScheduledToday ? unschedule(item.id) : scheduleOn(item.id, todayISO()))} style={isScheduledToday ? pillActive : pill}>
+              {isScheduledToday ? '✓ Dagens Fokus' : '+ Dagens Fokus'}
+            </button>
+            <button onClick={() => toggleShoppingList(item.id)} style={item.in_shopping_list ? pillActive : pill}>
+              {item.in_shopping_list ? '✓ Inköpslista' : '+ Inköpslista'}
+            </button>
+          </div>
+
           <label style={labelStyle}>Beskrivning</label>
           <textarea
             value={descriptionDraft}
@@ -421,15 +434,6 @@ export default function ItemDetailModal({ itemId, onClose }) {
 
           <label style={labelStyle}>Administrativt</label>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
-            <button onClick={() => togglePrioritized(item.id)} style={item.status === 'prioriterad' ? pillActive : pill}>
-              {item.status === 'prioriterad' ? '✓ Prioriterad' : '+ Prioriterad'}
-            </button>
-            <button onClick={() => (isScheduledToday ? unschedule(item.id) : scheduleOn(item.id, todayISO()))} style={isScheduledToday ? pillActive : pill}>
-              {isScheduledToday ? '✓ Dagens Fokus' : '+ Dagens Fokus'}
-            </button>
-            <button onClick={() => toggleShoppingList(item.id)} style={item.in_shopping_list ? pillActive : pill}>
-              {item.in_shopping_list ? '✓ Inköpslista' : '+ Inköpslista'}
-            </button>
             <button
               onClick={() => setReminder(reminder ? null : { date: item.scheduled_date ?? todayISO(), time: nextHalfHour() })}
               style={reminder ? pillActive : pill}

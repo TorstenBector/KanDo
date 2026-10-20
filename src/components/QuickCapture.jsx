@@ -334,6 +334,20 @@ export default function QuickCapture() {
                 />
               </div>
 
+              {/* Snabbval direkt under taggarna, ovanför Beskrivning, så de inte
+                  hamnar bakom tangentbordet (KanDo Vibe #8408). */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.85rem' }}>
+                <button onClick={() => setPrioritized((v) => !v)} style={prioritized ? pillActive : pill}>
+                  {prioritized ? '✓ Prioriterad' : '+ Prioriterad'}
+                </button>
+                <button onClick={() => setScheduledDate(isScheduledToday ? null : todayISO())} style={isScheduledToday ? pillActive : pill}>
+                  {isScheduledToday ? '✓ Dagens Fokus' : '+ Dagens Fokus'}
+                </button>
+                <button onClick={() => setShoppingList((v) => !v)} style={shoppingList ? pillActive : pill}>
+                  {shoppingList ? '✓ Inköpslista' : '+ Inköpslista'}
+                </button>
+              </div>
+
               <label style={labelStyle}>Beskrivning</label>
               <textarea
                 value={description}
@@ -400,17 +414,6 @@ export default function QuickCapture() {
               </div>
 
               <label style={labelStyle}>Administrativt</label>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.5rem' }}>
-                <button onClick={() => setPrioritized((v) => !v)} style={prioritized ? pillActive : pill}>
-                  {prioritized ? '✓ Prioriterad' : '+ Prioriterad'}
-                </button>
-                <button onClick={() => setScheduledDate(isScheduledToday ? null : todayISO())} style={isScheduledToday ? pillActive : pill}>
-                  {isScheduledToday ? '✓ Dagens Fokus' : '+ Dagens Fokus'}
-                </button>
-                <button onClick={() => setShoppingList((v) => !v)} style={shoppingList ? pillActive : pill}>
-                  {shoppingList ? '✓ Inköpslista' : '+ Inköpslista'}
-                </button>
-              </div>
               <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '0.85rem' }}>
                 <select
                   value={recurrencePreset}

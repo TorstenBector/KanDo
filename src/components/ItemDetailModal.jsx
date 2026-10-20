@@ -5,7 +5,7 @@ import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } 
 import { CSS } from '@dnd-kit/utilities'
 import { db } from '../lib/db'
 import {
-  updateItem, deleteItem, cloneItem, setRecurrence, setRecurrenceWeekdays,
+  updateItem, deleteItem, cloneItem, setRecurrence, setRecurrenceWeekdays, finishRecurringItem,
   addChildItem, removeChildRelation, reorderChildren, markDoneWithConfirm,
   pauseItem, resumeItem, toggleShoppingList, togglePrioritized, scheduleOn, unschedule,
 } from '../hooks/useItems'
@@ -226,6 +226,12 @@ export default function ItemDetailModal({ itemId, onClose }) {
   async function handleDelete() {
     if (!window.confirm(`Ta bort "${item.title}" permanent?`)) return
     await deleteItem(item.id)
+    onClose()
+  }
+
+  async function handleFinishRecurring() {
+    if (!window.confirm(`Avsluta "${item.title}" helt? Den markeras som klar och kommer inte tillbaka igen.`)) return
+    await finishRecurringItem(item.id)
     onClose()
   }
 
@@ -502,6 +508,11 @@ export default function ItemDetailModal({ itemId, onClose }) {
                   )
                 })}
               </div>
+            )}
+            {(item.recurrence_days || item.recurrence_weekdays?.length > 0) && (
+              <button onClick={handleFinishRecurring} style={secondaryBtn}>
+                ⏹ Avsluta helt
+              </button>
             )}
           </div>
           <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center', marginBottom: '0.5rem' }}>

@@ -136,6 +136,21 @@ export async function markDone(id) {
   await updateItem(id, changes)
 }
 
+// "Klar" on a recurring item only finishes this occurrence — it comes back
+// via reactivateDueRecurringItems. This ends the whole series: done now,
+// and the recurrence is cleared so it never reactivates (Vibe #8379).
+export async function finishRecurringItem(id) {
+  const now = new Date().toISOString()
+  await updateItem(id, {
+    status: 'klar',
+    completed_at: now,
+    last_completed_at: now,
+    recurrence_days: null,
+    recurrence_weekdays: null,
+    next_due_date: null,
+  })
+}
+
 export async function reopenItem(id) {
   await updateItem(id, { status: 'prioriterad', completed_at: null })
 }

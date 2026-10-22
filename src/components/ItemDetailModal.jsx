@@ -16,6 +16,7 @@ import {
   attachmentKindOf, decodeTextAttachment, downloadAttachment,
 } from '../hooks/useAttachments'
 import FileTile from './FileTile'
+import SmsSendModal from './SmsSendModal'
 import { useEditBuffer } from '../hooks/useEditBuffer'
 import { addMonthsISO, todayISO } from '../lib/date'
 import { useVisualViewport, isKeyboardOpen, useBodyScrollLock } from '../hooks/useVisualViewport'
@@ -67,6 +68,7 @@ export default function ItemDetailModal({ itemId, onClose }) {
   const [showWeekdays, setShowWeekdays] = useState(false)
   // ⏰ Påminn mig (Vibe #8293): null = stängd, annars { date, time }.
   const [reminder, setReminder] = useState(null)
+  const [showSms, setShowSms] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [lightboxImage, setLightboxImage] = useState(null)
   const [textPreview, setTextPreview] = useState(null) // { filename, content }
@@ -440,6 +442,9 @@ export default function ItemDetailModal({ itemId, onClose }) {
             >
               ⏰ Påminn mig
             </button>
+            <button onClick={() => setShowSms(true)} style={pill}>
+              📱 Skicka SMS
+            </button>
           </div>
           {reminder && (
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center', marginBottom: '0.5rem' }}>
@@ -595,6 +600,13 @@ export default function ItemDetailModal({ itemId, onClose }) {
         </div>
       </div>
     </div>
+
+    {showSms && (
+      <SmsSendModal
+        initialMessage={[item.title, item.description].filter(Boolean).join('\n\n')}
+        onClose={() => setShowSms(false)}
+      />
+    )}
 
     {lightboxImage && (
       // Bilder sparas som data:-URL:er (base64) — att öppna dem via en vanlig

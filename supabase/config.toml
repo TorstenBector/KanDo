@@ -411,3 +411,6 @@ s3_secret_key = "env(S3_SECRET_KEY)"
 # från Stripe-signaturen (STRIPE_WEBHOOK_SECRET), inte ett Supabase-JWT.
 [functions.stripe-webhook]
 verify_jwt = false
+
+[functions.send-sms]
+verify_jwt = true

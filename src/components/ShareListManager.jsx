@@ -5,6 +5,7 @@ import { useTags } from '../hooks/useTags'
 import { useSyncStore } from '../store/syncStore'
 import { supabase } from '../lib/supabaseClient'
 import { theme } from '../theme'
+import SmsSendModal from './SmsSendModal'
 
 // Sharing is online-only by design (unlike the rest of the app) — a share
 // is meaningless until it exists server-side for someone else to open, so
@@ -19,6 +20,7 @@ export default function ShareListManager() {
   const [loading, setLoading] = useState(true)
   const [busyTagId, setBusyTagId] = useState(null)
   const [copiedToken, setCopiedToken] = useState(null)
+  const [smsShare, setSmsShare] = useState(null)
 
   // How many items with this tag are already claimed — read straight from
   // Dexie (local-first) rather than a network round-trip, since claiming
@@ -175,6 +177,7 @@ export default function ShareListManager() {
                     <button onClick={() => copyLink(share.token)} style={secondaryBtn}>
                       {copiedToken === share.token ? '✓ Kopierad' : 'Kopiera länk'}
                     </button>
+                    <button onClick={() => setSmsShare(share)} style={secondaryBtn}>📱 SMS</button>
                   </div>
                   <div style={{ fontSize: '0.8rem', color: theme.colors.textMuted }}>
                     {summary && summary.total > 0
@@ -187,6 +190,13 @@ export default function ShareListManager() {
           )
         })}
       </div>
+
+      {smsShare && (
+        <SmsSendModal
+          initialMessage={`${smsShare.title}: ${shareUrlFor(smsShare.token)}`}
+          onClose={() => setSmsShare(null)}
+        />
+      )}
     </div>
   )
 }

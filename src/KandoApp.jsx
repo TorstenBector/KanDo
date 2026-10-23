@@ -109,9 +109,9 @@ export default function KandoApp() {
         is measured from the bottom of the whole (tall) page instead of the
         visible screen, so QuickCapture's + button/modals end up scrolled
         far below the fold on any list longer than one screen (KanDo Vibe
-        #1886 — "Flytande plus"). Fixed height + overflowY:auto makes this
-        div itself the scrolling viewport, so "fixed" behaves like it does
-        in normal (non-mobileLook) mode: always glued to this frame's edge. */}
+        #1886 — "Flytande plus"). The frame itself does NOT scroll (see the
+        inner div below, #8475), so "fixed" behaves like it does in normal
+        (non-mobileLook) mode: always glued to this frame's visible edge. */}
     <div
       style={
         mobileLook
@@ -119,7 +119,7 @@ export default function KandoApp() {
               maxWidth: '430px',
               margin: '0 auto',
               height: '100vh',
-              overflowY: 'auto',
+              overflow: 'hidden',
               position: 'relative',
               transform: 'translateZ(0)',
               boxShadow: theme.shadow.md,
@@ -128,6 +128,13 @@ export default function KandoApp() {
           : { minHeight: '100vh', background: theme.colors.bg }
       }
     >
+    {/* Mobillook: scrollen ligger i den här INRE diven, inte i ramen ovan.
+        Var ramen själv både transform-ram och scrollyta följde alla
+        "fixed"-element med innehållet när man scrollade — ett kort som
+        öppnades långt ner i Dagens Fokus hamnade överst i hela listan,
+        ovanför bild (KanDo Vibe #8475). Nu scrollar bara innehållet, och
+        modaler/plus-knapp sitter fast mot ramens synliga yta. */}
+    <div style={mobileLook ? { height: '100%', overflowY: 'auto' } : undefined}>
       <header
         style={{
           position: 'sticky',
@@ -231,6 +238,7 @@ export default function KandoApp() {
       </main>
 
       <QuickCapture />
+    </div>
     </div>
     </div>
   )

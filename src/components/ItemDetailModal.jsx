@@ -20,7 +20,7 @@ import SmsSendModal from './SmsSendModal'
 import { useEditBuffer } from '../hooks/useEditBuffer'
 import { addMonthsISO, todayISO } from '../lib/date'
 import { useVisualViewport, isKeyboardOpen, useBodyScrollLock } from '../hooks/useVisualViewport'
-import { TagChip, PlannedDatePill } from './CaptureControls'
+import { TagChip, PlannedDatePill, QuickToggles } from './CaptureControls'
 import { pill, pillActive } from './captureStyles'
 import TagInput from './TagInput'
 import TagCoOccurrenceSuggestions from './TagCoOccurrenceSuggestions'
@@ -352,17 +352,14 @@ export default function ItemDetailModal({ itemId, onClose }) {
           </div>
 
           {/* Snabbval ovanför Beskrivning, samma ordning som Snabbfånga (KanDo Vibe #8408). */}
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.85rem' }}>
-            <button onClick={() => togglePrioritized(item.id)} style={item.status === 'prioriterad' ? pillActive : pill}>
-              {item.status === 'prioriterad' ? '✓ Prioriterad' : '+ Prioriterad'}
-            </button>
-            <button onClick={() => (isScheduledToday ? unschedule(item.id) : scheduleOn(item.id, todayISO()))} style={isScheduledToday ? pillActive : pill}>
-              {isScheduledToday ? '✓ Dagens Fokus' : '+ Dagens Fokus'}
-            </button>
-            <button onClick={() => toggleShoppingList(item.id)} style={item.in_shopping_list ? pillActive : pill}>
-              {item.in_shopping_list ? '✓ Inköpslista' : '+ Inköpslista'}
-            </button>
-          </div>
+          <QuickToggles
+            prioritized={item.status === 'prioriterad'}
+            onTogglePrioritized={() => togglePrioritized(item.id)}
+            inFocus={isScheduledToday}
+            onToggleFocus={() => (isScheduledToday ? unschedule(item.id) : scheduleOn(item.id, todayISO()))}
+            inShoppingList={!!item.in_shopping_list}
+            onToggleShoppingList={() => toggleShoppingList(item.id)}
+          />
 
           <label style={labelStyle}>Beskrivning</label>
           <textarea

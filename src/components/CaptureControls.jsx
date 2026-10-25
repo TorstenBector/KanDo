@@ -58,3 +58,39 @@ export function PlannedDatePill({ value, onChange, min }) {
     </>
   )
 }
+
+// Snabbvalsraden ovanför Beskrivning — samma i Snabbfånga och kortets
+// editläge. Dagens Fokus är knappen man trycker på hela tiden, så den får
+// växa och fylla ut mellan Prioriterad och Inköpslista (som ligger mot
+// högerkanten) och har en tydligare ram (KanDo Vibe #8510).
+export function QuickToggles({ prioritized, onTogglePrioritized, inFocus, onToggleFocus, inShoppingList, onToggleShoppingList }) {
+  const side = { whiteSpace: 'nowrap', flexShrink: 0 }
+  const focusBase = {
+    flex: 1,
+    minWidth: 0,
+    whiteSpace: 'nowrap',
+    fontSize: '0.9rem',
+    fontWeight: 700,
+    padding: '0.45rem 0.6rem',
+  }
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.85rem' }}>
+      <button onClick={onTogglePrioritized} style={{ ...(prioritized ? pillActive : pill), ...side }}>
+        {prioritized ? '✓ Prioriterad' : '+ Prioriterad'}
+      </button>
+      <button
+        onClick={onToggleFocus}
+        style={
+          inFocus
+            ? { ...pillActive, ...focusBase, border: `2px solid ${theme.colors.primary}` }
+            : { ...pill, ...focusBase, border: `2px solid ${theme.colors.primary}`, color: theme.colors.primary, background: theme.colors.surfaceGreen }
+        }
+      >
+        {inFocus ? '✓ Dagens Fokus' : '+ Dagens Fokus'}
+      </button>
+      <button onClick={onToggleShoppingList} style={{ ...(inShoppingList ? pillActive : pill), ...side }}>
+        {inShoppingList ? '✓ Inköpslista' : '+ Inköpslista'}
+      </button>
+    </div>
+  )
+}

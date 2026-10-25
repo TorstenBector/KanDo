@@ -7,8 +7,7 @@ import { useVisualViewport, isKeyboardOpen, useBodyScrollLock } from '../hooks/u
 import TagInput from './TagInput'
 import TagCoOccurrenceSuggestions from './TagCoOccurrenceSuggestions'
 import { todayISO } from '../lib/date'
-import { TagChip, PlannedDatePill } from './CaptureControls'
-import { pill, pillActive } from './captureStyles'
+import { TagChip, PlannedDatePill, QuickToggles } from './CaptureControls'
 import { theme } from '../theme'
 
 const RECURRENCE_PRESETS = [
@@ -336,17 +335,14 @@ export default function QuickCapture() {
 
               {/* Snabbval direkt under taggarna, ovanför Beskrivning, så de inte
                   hamnar bakom tangentbordet (KanDo Vibe #8408). */}
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '0.85rem' }}>
-                <button onClick={() => setPrioritized((v) => !v)} style={prioritized ? pillActive : pill}>
-                  {prioritized ? '✓ Prioriterad' : '+ Prioriterad'}
-                </button>
-                <button onClick={() => setScheduledDate(isScheduledToday ? null : todayISO())} style={isScheduledToday ? pillActive : pill}>
-                  {isScheduledToday ? '✓ Dagens Fokus' : '+ Dagens Fokus'}
-                </button>
-                <button onClick={() => setShoppingList((v) => !v)} style={shoppingList ? pillActive : pill}>
-                  {shoppingList ? '✓ Inköpslista' : '+ Inköpslista'}
-                </button>
-              </div>
+              <QuickToggles
+                prioritized={prioritized}
+                onTogglePrioritized={() => setPrioritized((v) => !v)}
+                inFocus={isScheduledToday}
+                onToggleFocus={() => setScheduledDate(isScheduledToday ? null : todayISO())}
+                inShoppingList={shoppingList}
+                onToggleShoppingList={() => setShoppingList((v) => !v)}
+              />
 
               <label style={labelStyle}>Beskrivning</label>
               <textarea

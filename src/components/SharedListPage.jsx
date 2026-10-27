@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
-import { isImageAttachment, attachmentKindOf, downloadAttachment } from '../hooks/useAttachments'
+import { isImageAttachment, attachmentKindOf, downloadAttachment, openPdfAttachment } from '../hooks/useAttachments'
 import FileTile from './FileTile'
 import { theme } from '../theme'
 
@@ -279,7 +279,7 @@ function SharedItemDetailModal({ token, itemId, onClose }) {
                     <button
                       key={img.id}
                       type="button"
-                      onClick={() => downloadAttachment(img.data_url, img.filename)}
+                      onClick={() => (attachmentKindOf(img) === 'pdf' ? openPdfAttachment : downloadAttachment)(img.data_url, img.filename)}
                       style={{ border: 'none', background: 'none', padding: 0, cursor: 'pointer', display: 'block' }}
                     >
                       <FileTile kind={attachmentKindOf(img)} filename={img.filename} />

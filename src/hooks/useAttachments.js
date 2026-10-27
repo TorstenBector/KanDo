@@ -8,11 +8,16 @@ import { useSyncStore } from '../store/syncStore'
 // itself. Kept modest since these sync as plain base64 text in the same
 // item_images row/table as photos (see item_attachments migration).
 export const MAX_ATTACHMENT_SIZE = 1 * 1024 * 1024 // 1 MB
+// PDF:er (manualer, kallelser, kartor) är sällan under 1 MB — egen, högre
+// gräns. Synken hämtar bilagor i små omgångar (sync.js) så en stor PDF inte
+// får hela synken att slå i tidsgränsen.
+export const MAX_PDF_SIZE = 4 * 1024 * 1024 // 4 MB
 
 const KIND_ICON = {
   markdown: '📝',
   text: '📄',
   excel: '📊',
+  pdf: '📕',
 }
 
 // Canonical MIME per kind, stored instead of the raw file.type — a file
@@ -23,6 +28,7 @@ const KIND_MIME = {
   markdown: 'text/markdown',
   text: 'text/plain',
   excel: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  pdf: 'application/pdf',
 }
 
 // Detects kind from both MIME type and extension — a file pasted from the
@@ -35,6 +41,7 @@ export function getAttachmentKind(file) {
   if (file.type?.startsWith('image/')) return 'image'
   if (ext === '.md' || ext === '.markdown' || file.type === 'text/markdown') return 'markdown'
   if (ext === '.txt' || file.type === 'text/plain') return 'text'
+  if (ext === '.pdf' || file.type === 'application/pdf') return 'pdf'
   if (
     ext === '.xlsx' || ext === '.xls' ||
     file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
@@ -51,8 +58,11 @@ export function attachmentIcon(kind) {
 // can't be attached, or null if it's fine.
 export function checkAttachmentAllowed(file) {
   const kind = getAttachmentKind(file)
-  if (!kind) return `Filtypen stöds inte (${file.name || 'okänd fil'}). Stödda format: bilder, Markdown, Excel, textfil.`
-  if (kind !== 'image' && file.size > MAX_ATTACHMENT_SIZE) {
+  if (!kind) return `Filtypen stöds inte (${file.name || 'okänd fil'}). Stödda format: bilder, PDF, Markdown, Excel, textfil.`
+  if (kind === 'pdf' && file.size > MAX_PDF_SIZE) {
+    return `"${file.name}" är för stor (max 4 MB för PDF).`
+  }
+  if (kind !== 'image' && kind !== 'pdf' && file.size > MAX_ATTACHMENT_SIZE) {
     return `"${file.name}" är för stor (max 1 MB för icke-bildfiler).`
   }
   return null
@@ -167,4 +177,22 @@ export function downloadAttachment(dataUrl, filename) {
   a.href = dataUrl
   a.download = filename || 'fil'
   a.click()
+}
+
+// Öppnar en PDF-bilaga i webbläsarens egen PDF-visare. data:-URL:er i ny flik
+// blockeras tyst av iOS Safari (se downloadAttachment), så den görs om till
+// en blob-URL först. Blockeras fönstret ändå laddas filen ner i stället.
+export function openPdfAttachment(dataUrl, filename) {
+  const base64 = dataUrl.slice(dataUrl.indexOf(',') + 1)
+  const bytes = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))
+  const url = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }))
+  const win = window.open(url, '_blank')
+  if (!win) {
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename || 'dokument.pdf'
+    a.click()
+  }
+  // Ge visaren tid att läsa in filen innan minnet släpps.
+  setTimeout(() => URL.revokeObjectURL(url), 60_000)
 }

@@ -238,9 +238,15 @@ export async function pullRemoteChanges(userId) {
   if (remoteImageIds?.length) {
     const localIds = new Set(await db.item_images.toCollection().primaryKeys())
     const missingIds = remoteImageIds.map((r) => r.id).filter((id) => !localIds.has(id))
-    if (missingIds.length > 0) {
-      const { data: fullImages, error: imgErr } = await supabase.from('item_images').select('*').in('id', missingIds)
-      if (imgErr) pullErrors.push(`bilder: ${imgErr.message}`)
+    // Hämtas i små omgångar: en bilaga kan vara en PDF på flera MB, och allt
+    // i en förfrågan kunde slå i 30 s-gränsen på ett segt mobilnät — då
+    // hämtades ingenting och samma jättesvar försöktes igen vid varje synk.
+    // Varje omgång sparas direkt, så en avbruten synk tappar inte det som
+    // redan kommit.
+    const IMAGE_PULL_BATCH = 4
+    for (let i = 0; i < missingIds.length; i += IMAGE_PULL_BATCH) {
+      const { data: fullImages, error: imgErr } = await supabase.from('item_images').select('*').in('id', missingIds.slice(i, i + IMAGE_PULL_BATCH))
+      if (imgErr) { pullErrors.push(`bilder: ${imgErr.message}`); break }
       if (fullImages?.length) {
         await db.item_images.bulkPut(fullImages.map((img) => ({ ...img, _syncStatus: 'synced' })))
       }

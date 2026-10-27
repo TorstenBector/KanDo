@@ -391,7 +391,7 @@ export default function QuickCapture() {
                   </div>
                 ))}
                 <label
-                  title="Bild, Markdown, Excel eller textfil"
+                  title="Bild, PDF, Markdown, Excel eller textfil"
                   style={{
                     width: '4.5rem', height: '4.5rem', borderRadius: theme.radius.sm,
                     border: `1px dashed ${theme.colors.border}`, display: 'flex',
@@ -402,7 +402,7 @@ export default function QuickCapture() {
                   📎 +
                   <input
                     type="file"
-                    accept="image/*,.md,.markdown,.txt,.xlsx,.xls"
+                    accept="image/*,.pdf,application/pdf,.md,.markdown,.txt,.xlsx,.xls"
                     onChange={handleFileSelect}
                     style={{ display: 'none' }}
                   />

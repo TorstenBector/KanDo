@@ -13,7 +13,7 @@ import { useItemTags, addItemTag } from '../hooks/useTags'
 import { useChildren, useParent } from '../hooks/useRelations'
 import {
   useItemAttachments, addAttachment, removeAttachment, checkAttachmentAllowed,
-  attachmentKindOf, decodeTextAttachment, downloadAttachment,
+  attachmentKindOf, decodeTextAttachment, downloadAttachment, openPdfAttachment,
 } from '../hooks/useAttachments'
 import FileTile from './FileTile'
 import SmsSendModal from './SmsSendModal'
@@ -139,6 +139,10 @@ export default function ItemDetailModal({ itemId, onClose }) {
     }
     if (kind === 'excel') {
       downloadAttachment(att.data_url, att.filename)
+      return
+    }
+    if (kind === 'pdf') {
+      openPdfAttachment(att.data_url, att.filename)
       return
     }
     setTextPreview({ filename: att.filename, content: decodeTextAttachment(att.data_url) })
@@ -412,7 +416,7 @@ export default function ItemDetailModal({ itemId, onClose }) {
               )
             })}
             <label
-              title="Bild, Markdown, Excel eller textfil"
+              title="Bild, PDF, Markdown, Excel eller textfil"
               style={{
                 width: '4.5rem', height: '4.5rem', borderRadius: theme.radius.sm,
                 border: `1px dashed ${theme.colors.border}`, display: 'flex',
@@ -423,7 +427,7 @@ export default function ItemDetailModal({ itemId, onClose }) {
               {uploading ? '…' : '📎 +'}
               <input
                 type="file"
-                accept="image/*,.md,.markdown,.txt,.xlsx,.xls"
+                accept="image/*,.pdf,application/pdf,.md,.markdown,.txt,.xlsx,.xls"
                 onChange={handleFileSelect}
                 style={{ display: 'none' }}
                 disabled={uploading}

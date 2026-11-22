@@ -16,6 +16,10 @@ export const theme = {
     danger:        '#CC3333',
     warning:       '#E8A020',
     warningSoft:   '#F6E2B8', // missade kort i veckovyn
+    // Plugg: passet börjar snart (15 min innan) — egen orange, tydligt
+    // skild från warning (gul-orange) som redan betyder "missad".
+    orange:        '#E8641E',
+    orangeSoft:    '#FCE3D2',
     // Subtask/child cards — deliberately its own hue (warm wheat, not
     // green or gold) so a nested child never reads as "done" or
     // "high priority" by accident. See spec discussion on child card styling.

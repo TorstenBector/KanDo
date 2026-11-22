@@ -19,6 +19,68 @@ export async function claimLocalData(userId) {
   for (const staple of orphanStaples) {
     await db.shopping_staples.update(staple.id, { user_id: userId, _syncStatus: 'pending' })
   }
+
+  for (const table of PLUGG_TABLES) {
+    const orphans = await db[table].filter((r) => !r.user_id).toArray()
+    for (const row of orphans) {
+      await db[table].update(row.id, { user_id: userId, _syncStatus: 'pending' })
+    }
+  }
+}
+
+// Aktiviteter före pass — passen har en främmande nyckel mot aktiviteten.
+const PLUGG_TABLES = ['plugg_activities', 'plugg_sessions']
+
+// Plugg: samma dirty-flagga + last-write-wins som stapelvarorna. Ett pass
+// vars aktivitet raderats på en annan enhet faller på främmande nyckel
+// (23503) varje gång — det tas bort lokalt i stället för att fastna för evigt.
+async function pushPlugg(userId, errors) {
+  for (const table of PLUGG_TABLES) {
+    const pending = await db[table].filter((r) => r._syncStatus === 'pending').toArray()
+    for (const row of pending) {
+      const { _syncStatus, ...data } = row
+      const { error } = await supabase.from(table).upsert({ ...data, user_id: userId })
+      if (error) {
+        if (error.code === '23503' && table === 'plugg_sessions') {
+          await db.plugg_sessions.delete(row.id)
+          continue
+        }
+        errors.push(`plugg: ${error.message}`)
+        continue
+      }
+      const current = await db[table].get(row.id)
+      if (current && current.updated_at === row.updated_at) {
+        await db[table].update(row.id, { _syncStatus: 'synced' })
+      }
+    }
+  }
+}
+
+// Hela mängden hämtas (den är liten). Synkade lokala rader som inte längre
+// finns på servern har raderats någon annanstans — t.ex. framtida pass som
+// försvann när schemat ändrades på en annan enhet — och tas bort här också.
+// Väntande rader rörs inte; de har ännu inte nått servern.
+async function pullPlugg(userId, errors) {
+  for (const table of PLUGG_TABLES) {
+    const { data: remote, error } = await supabase.from(table).select('*').eq('user_id', userId)
+    if (error) {
+      errors.push(`plugg: ${error.message}`)
+      continue
+    }
+    const remoteIds = new Set()
+    for (const row of remote ?? []) {
+      remoteIds.add(row.id)
+      const local = await db[table].get(row.id)
+      // Last-write-wins: nyare på servern vinner, även över en väntande lokal.
+      if (!local || new Date(row.updated_at) > new Date(local.updated_at)) {
+        await db[table].put({ ...row, _syncStatus: 'synced' })
+      }
+    }
+    const goneIds = (await db[table].where('user_id').equals(userId).toArray())
+      .filter((r) => r._syncStatus === 'synced' && !remoteIds.has(r.id))
+      .map((r) => r.id)
+    if (goneIds.length > 0) await db[table].bulkDelete(goneIds)
+  }
 }
 
 const ITEM_TAGS_CHUNK = 500
@@ -164,6 +226,8 @@ export async function pushPendingChanges(userId) {
     await db.shopping_staples.update(staple.id, { _syncStatus: 'synced' })
   }
 
+  await pushPlugg(userId, itemErrors)
+
   // Everything that *could* sync did; report what couldn't rather than
   // blocking the whole batch on the first failure.
   if (itemErrors.length > 0) {
@@ -261,6 +325,8 @@ export async function pullRemoteChanges(userId) {
       await db.shopping_staples.put({ ...remote, _syncStatus: 'synced' })
     }
   }
+
+  await pullPlugg(userId, pullErrors)
 
   if (pullErrors.length > 0) {
     const summary = pullErrors.length === 1

@@ -138,6 +138,17 @@ Se avsnittet "Specgenerator — versionshantering" nedan.
 
 Unik per `(item_id, version_date)`.
 
+## Plugg (studiestöd)
+
+Fliken **Plugg**: aktiviteter (t.ex. "Fysikprov 12/12") med ett veckoschema av pluggpass. Byggd för att hjälpa någon som har svårt att komma igång att planera pluggandet — ett stöd, inte en kontroll: användaren klarmarkerar själv.
+
+- `plugg_activities`: `title`, `description`, `end_date` (provdag — passen slutar efter den), `schedule` jsonb `[{ weekdays: [2,4], time: "18:45", minutes: 15 }]` (ISO-veckodagar, lokal tid), `archived_at`.
+- `plugg_sessions`: konkreta pass (`date`, `start_time` "HH:MM", `planned_minutes`, `extra_minutes`, `status` planerad/pagar/klar, timerfält `started_at`/`paused_at`/`paused_seconds`, `actual_seconds`, `confirmed_at`). Genereras av klienten 28 dagar framåt och fylls på vid uppstart (`topUpPluggSessions`). Id:t är deterministiskt ur aktivitet+datum+tid så flera enheter inte skapar dubbletter. Schemaändring tar bara bort/ändrar ej startade framtida pass.
+- Synk: dirty-flagga + last-write-wins; synkade lokala rader som saknas på servern tas bort vid pull.
+- Dagens pass visas överst i Dagens Fokus. Kortet blir **orange 15 min före start**. **Starta** → nedräkning med **Paus**; vid måltid ljudsignal (om appen är öppen) och valen **Klar** / **Kör 10 min till**. Ej klarmarkerat pass en tidigare dag = missat.
+
+Planerat (ej byggt): Web Push 15 min före (med "Det ska jag komma ihåg" → `confirmed_at`) och när måltiden nås; SMS vid start om obekräftat (svar "OK" bekräftar); kontokoppling med delning av aktivitet (läsrätt) och planeringsförslag från förälder; kalenderprenumeration (webcal) som reservlarm.
+
 ## RLS
 
 Radägarskap: `user_id = auth.uid()` på samtliga tabeller. Ingen rollhierarki behövs (till skillnad från Jaktkoll) — KanDo är per-användare, inte klubb-baserat.

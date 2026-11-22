@@ -23,11 +23,14 @@ import { useProfile } from './hooks/useProfile'
 import { useIsNarrowViewport } from './hooks/useIsNarrowViewport'
 import { reactivateDueRecurringItems, reactivatePausedItems, migrateLegacyItemStatus } from './hooks/useItems'
 import { seedDefaultStaplesIfEmpty } from './hooks/useShoppingStaples'
+import { topUpPluggSessions } from './hooks/usePlugg'
+import PluggView from './components/PluggView'
 import { theme } from './theme'
 
 const TABS = [
   { id: 'sok', label: 'Sök' },
   { id: 'fokus', label: 'Dagens Fokus' },
+  { id: 'plugg', label: 'Plugg' },
   { id: 'backlog', label: 'Backlog' },
   { id: 'prio', label: 'Prio' },
   { id: 'kanban', label: 'Kanban' },
@@ -81,6 +84,7 @@ export default function KandoApp() {
       await reactivateDueRecurringItems()
       await reactivatePausedItems()
       await seedDefaultStaplesIfEmpty()
+      await topUpPluggSessions()
     }
     boot()
   }, [initSync])
@@ -225,6 +229,7 @@ export default function KandoApp() {
 
       <main style={{ paddingBottom: '5rem' }}>
         {tab === 'fokus' && <DagensFokus selectedTagIds={selectedTagIds} />}
+        {tab === 'plugg' && <PluggView />}
         {tab === 'backlog' && <BacklogView selectedTagIds={selectedTagIds} />}
         {tab === 'prio' && <PrioListView selectedTagIds={selectedTagIds} />}
         {tab === 'kanban' && <KanbanBoard selectedTagIds={selectedTagIds} />}

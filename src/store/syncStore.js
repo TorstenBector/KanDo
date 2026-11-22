@@ -5,7 +5,7 @@ import { db } from '../lib/db'
 
 const STALE_SYNC_MS = 2 * 60 * 1000
 
-const SYNCED_TABLES = ['items', 'tags', 'item_images', 'shopping_staples']
+const SYNCED_TABLES = ['items', 'tags', 'item_images', 'shopping_staples', 'plugg_activities', 'plugg_sessions']
 
 // Rows edited locally but not yet pushed — across every synced table, not
 // just items (the header badge only counts items).

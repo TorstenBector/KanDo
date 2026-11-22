@@ -7,6 +7,7 @@ import { sortTagsByOrder } from '../hooks/useTags'
 import { todayISO, addDaysISO, parseLocalDateISO } from '../lib/date'
 import { byPriorityThenRank } from '../lib/priority'
 import WeekView from './WeekView'
+import PluggDaySection from './PluggDaySection'
 import ItemDetailModal from './ItemDetailModal'
 import { theme } from '../theme'
 import { EMPTY_ARRAY } from '../lib/empty'
@@ -347,6 +348,8 @@ export default function DagensFokus({ selectedTagIds }) {
         />
       ) : (
         <>
+      <PluggDaySection dateISO={selectedDate} />
+
       {isToday && !showScheduled && (
         <p style={{ color: theme.colors.textMuted, fontSize: '0.85rem', margin: '0 0 0.75rem' }}>
           Inget schemalagt idag — de fem högst prioriterade

@@ -22,3 +22,9 @@ db.version(2).stores({
 db.version(3).stores({
   tags: 'id, user_id, kind, name, parent_tag_id',
 })
+
+// Plugg: studieaktiviteter + deras pass (se supabase/migrations/20261122000000_plugg.sql)
+db.version(4).stores({
+  plugg_activities: 'id, user_id, end_date, updated_at, _syncStatus',
+  plugg_sessions: 'id, user_id, activity_id, date, status, updated_at, _syncStatus',
+})

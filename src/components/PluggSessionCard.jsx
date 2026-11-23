@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { useNow } from '../hooks/useNow'
-import { completeSession, extendSession, pauseSession, resetSession, resumeSession, startSession } from '../hooks/usePlugg'
+import { completeSession, confirmSession, extendSession, pauseSession, resetSession, resumeSession, startSession } from '../hooks/usePlugg'
 import { EXTEND_MINUTES, elapsedSeconds, formatClock, formatMinutes, sessionPhase, sessionStart, targetSeconds } from '../lib/plugg'
 import { chimeOnce, unlockAudio } from '../lib/pluggSound'
 import { formatShortDate, todayISO } from '../lib/date'
@@ -70,8 +70,17 @@ export default function PluggSessionCard({ session, activity, showDate = false, 
       </div>
 
       {phase === 'snart' && (
-        <div style={{ color: theme.colors.orange, fontWeight: 700, fontSize: '0.9rem' }}>
-          {minutesToStart > 0 ? `⏰ Börjar om ${minutesToStart} min` : '⏰ Dags nu!'}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+          <span style={{ color: theme.colors.orange, fontWeight: 700, fontSize: '0.9rem' }}>
+            {minutesToStart > 0 ? `⏰ Börjar om ${minutesToStart} min` : '⏰ Dags nu!'}
+          </span>
+          {session.confirmed_at ? (
+            <span style={{ fontSize: '0.8rem', color: theme.colors.textMuted }}>👍 Bekräftad</span>
+          ) : (
+            <button onClick={() => confirmSession(session.id)} style={{ ...linkBtn, color: theme.colors.orange, fontWeight: 600 }}>
+              👍 Det ska jag komma ihåg
+            </button>
+          )}
         </div>
       )}
 

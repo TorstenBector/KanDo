@@ -23,7 +23,8 @@ import { useProfile } from './hooks/useProfile'
 import { useIsNarrowViewport } from './hooks/useIsNarrowViewport'
 import { reactivateDueRecurringItems, reactivatePausedItems, migrateLegacyItemStatus } from './hooks/useItems'
 import { seedDefaultStaplesIfEmpty } from './hooks/useShoppingStaples'
-import { topUpPluggSessions } from './hooks/usePlugg'
+import { confirmSession, topUpPluggSessions } from './hooks/usePlugg'
+import { refreshPushSubscription } from './lib/push'
 import PluggView from './components/PluggView'
 import { theme } from './theme'
 
@@ -85,9 +86,35 @@ export default function KandoApp() {
       await reactivatePausedItems()
       await seedDefaultStaplesIfEmpty()
       await topUpPluggSessions()
+      await openPluggFromUrl(window.location.href)
+      refreshPushSubscription()
     }
     boot()
   }, [initSync])
+
+  // Tryck på en Plugg-notis: ?plugg=<pass-id>(&bekrafta=1) — visa Plugg och
+  // bekräfta påminnelsen. Är appen redan öppen skickar service workern
+  // samma URL som meddelande i stället för att ladda om (public/push-sw.js).
+  async function openPluggFromUrl(href) {
+    const url = new URL(href, window.location.origin)
+    const sessionId = url.searchParams.get('plugg')
+    if (!sessionId) return
+    setTab('plugg')
+    if (url.searchParams.get('bekrafta') === '1') await confirmSession(sessionId)
+    const clean = new URL(window.location.href)
+    clean.searchParams.delete('plugg')
+    clean.searchParams.delete('bekrafta')
+    window.history.replaceState(null, '', clean.toString())
+  }
+
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return undefined
+    const onMessage = (event) => {
+      if (event.data?.type === 'kando-open-url') openPluggFromUrl(event.data.url)
+    }
+    navigator.serviceWorker.addEventListener('message', onMessage)
+    return () => navigator.serviceWorker.removeEventListener('message', onMessage)
+  }, [])
 
   // First-time users (logged in, no profile row yet) see the registration
   // screen instead of the app. Local-first use with no login is unaffected —

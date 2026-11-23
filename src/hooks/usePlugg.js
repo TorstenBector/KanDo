@@ -178,6 +178,14 @@ export async function deleteActivity(id) {
   deleteRemote('plugg_activities', [id])
 }
 
+// "Det ska jag komma ihåg" — bekräftar påminnelsen (stoppar SMS senare).
+export async function confirmSession(id) {
+  const session = await db.plugg_sessions.get(id)
+  if (!session || session.confirmed_at) return
+  await writeRow('plugg_sessions', id, { confirmed_at: new Date().toISOString() })
+  triggerPush()
+}
+
 // ---- Passets timer ----
 
 export async function startSession(id) {

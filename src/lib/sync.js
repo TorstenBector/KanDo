@@ -38,7 +38,10 @@ async function pushPlugg(userId, errors) {
   for (const table of PLUGG_TABLES) {
     const pending = await db[table].filter((r) => r._syncStatus === 'pending').toArray()
     for (const row of pending) {
-      const { _syncStatus, ...data } = row
+      // Serverns egna fält (sätts av trigger/plugg-push) skickas aldrig —
+      // en lokal kopia utan dem skulle annars nolla t.ex. reminder_sent_at
+      // och ge en dubbel påminnelse.
+      const { _syncStatus, starts_at: _s, reminder_sent_at: _r, done_notified_target: _d, ...data } = row
       const { error } = await supabase.from(table).upsert({ ...data, user_id: userId })
       if (error) {
         if (error.code === '23503' && table === 'plugg_sessions') {

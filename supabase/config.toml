@@ -414,3 +414,8 @@ verify_jwt = false
 
 [functions.send-sms]
 verify_jwt = true
+
+# Anropas av pg_cron (x-cron-secret) och av service workern (signerad token)
+# — ingen av dem har en JWT. Funktionen kontrollerar behörighet per action.
+[functions.plugg-push]
+verify_jwt = false

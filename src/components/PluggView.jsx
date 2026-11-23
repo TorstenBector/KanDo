@@ -4,6 +4,7 @@ import { daysUntil, describeSlot, formatMinutes } from '../lib/plugg'
 import { formatShortDate, todayISO } from '../lib/date'
 import PluggSessionCard from './PluggSessionCard'
 import PluggActivityEditor from './PluggActivityEditor'
+import PushSettings from './PushSettings'
 import { theme } from '../theme'
 
 const UPCOMING_SHOWN = 4
@@ -24,6 +25,8 @@ export default function PluggView() {
   return (
     <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1.2rem', maxWidth: '720px' }}>
       <button onClick={() => setEditing('new')} style={newBtn}>+ Ny pluggaktivitet</button>
+
+      <PushSettings />
 
       <section>
         <h2 style={h2}>Idag</h2>

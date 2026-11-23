@@ -24,6 +24,8 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
+        // Pushnotiser (Plugg) — se public/push-sw.js.
+        importScripts: ['push-sw.js'],
       },
     }),
   ],

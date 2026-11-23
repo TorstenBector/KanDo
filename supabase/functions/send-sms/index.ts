@@ -4,6 +4,7 @@
 // (SMSBANG_API_KEY) — nyckeln får aldrig ligga i webbläsaren.
 // Spärr per användare/dygn sköts av sms-enqueue.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { fetchSmsStatus } from '../_shared/smsbang.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -22,7 +23,18 @@ Deno.serve(async (req) => {
     const { data: { user } } = await supabase.auth.getUser(jwt)
     if (!user) return json({ error: 'Du behöver vara inloggad' }, 401)
 
-    const { phone, name, message } = await req.json()
+    const body = await req.json()
+
+    // Läget för SMS-telefonen, så rutan kan varna innan man skickar.
+    if (body.action === 'status') {
+      try {
+        return json(await fetchSmsStatus(user.id))
+      } catch (err) {
+        return json({ error: (err as Error).message, online: null }, 200)
+      }
+    }
+
+    const { phone, name, message } = body
 
     const res = await fetch(Deno.env.get('SMSBANG_ENQUEUE_URL')!, {
       method: 'POST',
@@ -45,7 +57,9 @@ Deno.serve(async (req) => {
       { onConflict: 'user_id,phone' },
     )
 
-    return json({ ok: true, remainingToday: result.remainingToday })
+    // Telefonen offline? Säg det direkt, så SMS:et inte bara "försvinner".
+    const status = await fetchSmsStatus(user.id).catch(() => null)
+    return json({ ok: true, remainingToday: result.remainingToday, gatewayOnline: status?.online ?? null, gateway: status?.gateways?.[0] ?? null })
   } catch (error) {
     console.error('[send-sms] Fel:', (error as Error).message)
     return json({ error: (error as Error).message }, 400)

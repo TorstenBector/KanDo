@@ -13,6 +13,7 @@
 // varje action kontrollerar själv sin behörighet.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { bytesToB64url, sendWebPush, type VapidKeys } from '../_shared/webpush.ts'
+import { fetchSmsStatus } from '../_shared/smsbang.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -124,8 +125,13 @@ async function tick() {
     return over >= 0 && over < 30 * 60 && s.done_notified_target !== targetMin
   })
 
+  const sms = await watchSmsGateway().catch((err) => {
+    console.error('[plugg-push] SMS-bevakning:', (err as Error).message)
+    return 'fel'
+  })
+
   const all = [...(due ?? []), ...finished]
-  if (all.length === 0) return { reminders: 0, done: 0 }
+  if (all.length === 0) return { reminders: 0, done: 0, sms }
   const subsByUser = await loadSubs([...new Set(all.map((s) => s.user_id))])
   const titles = await loadActivityTitles([...new Set(all.map((s) => s.activity_id))])
 
@@ -178,7 +184,58 @@ async function tick() {
     }, subsByUser)
     done++
   }
-  return { reminders, done }
+  return { reminders, done, sms }
+}
+
+// SMSbang-telefonen: larma administratörerna när den varit tyst > 1 h, och
+// när den är tillbaka. Körs var 5:e minut (tick körs varje minut).
+const SMS_OFFLINE_ALERT_SECONDS = 3600
+
+async function watchSmsGateway(): Promise<string> {
+  if (new Date().getUTCMinutes() % 5 !== 0) return 'hoppar'
+  const adminIds = (Deno.env.get('SMS_ALERT_USER_IDS') ?? '').split(',').map((s) => s.trim()).filter(Boolean)
+  if (adminIds.length === 0) return 'ingen mottagare'
+
+  const status = await fetchSmsStatus()
+  const gw = status.gateways?.[0]
+  const { data: watch } = await supabase.from('sms_gateway_watch').select('state').eq('id', 1).maybeSingle()
+  const state = watch?.state ?? 'online'
+  await supabase.from('sms_gateway_watch').update({ last_checked_at: new Date().toISOString() }).eq('id', 1)
+
+  const silentFor = gw?.secondsSinceSeen ?? Infinity
+  if (!status.online && silentFor > SMS_OFFLINE_ALERT_SECONDS && state !== 'offline_alerted') {
+    const since = gw?.lastSeenUtc
+      ? new Date(gw.lastSeenUtc).toLocaleString('sv-SE', { timeZone: 'Europe/Stockholm', weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+      : 'okänd tid'
+    const subs = await loadSubs(adminIds)
+    for (const id of adminIds) {
+      await pushToUser(id, {
+        kind: 'sms-gateway',
+        title: '📵 SMS-telefonen är offline',
+        body: `Senast hörd ${since}${typeof gw?.batteryPct === 'number' ? ` (batteri ${gw.batteryPct} %)` : ''}. ${status.pending.total} SMS från KanDo väntar. Kolla laddare, wifi och att SMS-bang körs.`,
+        tag: 'sms-gateway',
+        url: '/',
+      }, subs)
+    }
+    await supabase.from('sms_gateway_watch').update({ state: 'offline_alerted', changed_at: new Date().toISOString() }).eq('id', 1)
+    return 'larmat offline'
+  }
+
+  if (status.online && state === 'offline_alerted') {
+    const subs = await loadSubs(adminIds)
+    for (const id of adminIds) {
+      await pushToUser(id, {
+        kind: 'sms-gateway',
+        title: '✅ SMS-telefonen är igång igen',
+        body: status.pending.total > 0 ? `${status.pending.total} SMS i kön skickas nu.` : 'Allt som låg i kön är skickat.',
+        tag: 'sms-gateway',
+        url: '/',
+      }, subs)
+    }
+    await supabase.from('sms_gateway_watch').update({ state: 'online', changed_at: new Date().toISOString() }).eq('id', 1)
+    return 'larmat online'
+  }
+  return status.online ? 'online' : 'offline'
 }
 
 Deno.serve(async (req) => {

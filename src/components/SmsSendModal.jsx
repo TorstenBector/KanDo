@@ -21,7 +21,19 @@ export default function SmsSendModal({ initialMessage = '', onClose }) {
   const [recipient, setRecipient] = useState(null) // { name, phone }
   const [newName, setNewName] = useState('')
   const [message, setMessage] = useState(initialMessage.slice(0, MAX_LENGTH))
-  const [status, setStatus] = useState(null) // null | 'sending' | { ok, remaining } | { error }
+  const [status, setStatus] = useState(null) // null | 'sending' | { ok, remaining, queuedOnly } | { error }
+  // Läget för SMSbang-telefonen hemma (via send-sms → Jaktkolls sms-status).
+  const [gateway, setGateway] = useState(null)
+
+  useEffect(() => {
+    if (!session) return undefined
+    let alive = true
+    supabase.functions.invoke('send-sms', { body: { action: 'status' } }).then(
+      ({ data }) => { if (alive && data && typeof data.online === 'boolean') setGateway(data) },
+      () => {},
+    )
+    return () => { alive = false }
+  }, [session])
 
   useEffect(() => {
     if (!session) return
@@ -62,9 +74,15 @@ export default function SmsSendModal({ initialMessage = '', onClose }) {
       setStatus({ error: detail })
       return
     }
-    setStatus({ ok: true, remaining: data?.remainingToday })
-    setTimeout(onClose, 1800)
+    // Telefonen offline: stäng inte automatiskt — visa att SMS:et väntar i kön.
+    const queuedOnly = data?.gatewayOnline === false
+    setStatus({ ok: true, remaining: data?.remainingToday, queuedOnly })
+    if (queuedOnly && data?.gateway) setGateway((g) => ({ ...(g ?? {}), online: false, gateways: [data.gateway] }))
+    if (!queuedOnly) setTimeout(onClose, 1800)
   }
+
+  const gw = gateway?.gateways?.[0]
+  const offline = gateway?.online === false
 
   return (
     <div
@@ -93,6 +111,20 @@ export default function SmsSendModal({ initialMessage = '', onClose }) {
           <p style={{ color: theme.colors.textMuted }}>Du behöver vara inloggad för att skicka SMS.</p>
         ) : (
           <>
+            {offline && (
+              <div
+                style={{
+                  background: theme.colors.orangeSoft, border: `2px solid ${theme.colors.orange}`, borderRadius: theme.radius.sm,
+                  padding: '0.6rem 0.7rem', marginBottom: '0.75rem', fontSize: '0.85rem', color: theme.colors.text, lineHeight: 1.4,
+                }}
+              >
+                <strong>📵 SMS-telefonen är offline</strong>
+                {gw?.lastSeenUtc && <> sedan {formatSeen(gw.lastSeenUtc)}</>}
+                {typeof gw?.batteryPct === 'number' && <> (batteri {gw.batteryPct} %{gw.charging ? ', laddar' : ''})</>}.
+                {' '}SMS läggs i kön och skickas när den är igång igen.
+                {gateway?.mine?.pending > 0 && <> Du har {gateway.mine.pending} SMS som väntar.</>}
+              </div>
+            )}
             <label style={labelStyle}>Till</label>
             {recipient ? (
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem', flexWrap: 'wrap' }}>
@@ -166,10 +198,16 @@ export default function SmsSendModal({ initialMessage = '', onClose }) {
                 {status === 'sending' ? 'Skickar…' : '📤 Skicka SMS'}
               </button>
             </div>
-            {status?.ok && (
+            {status?.ok && !status.queuedOnly && (
               <p style={{ color: theme.colors.primary, fontWeight: 600, fontSize: '0.85rem' }}>
                 ✅ Skickat! Kommer fram inom ungefär en halv minut.
                 {typeof status.remaining === 'number' && ` (${status.remaining} SMS kvar idag)`}
+              </p>
+            )}
+            {status?.ok && status.queuedOnly && (
+              <p style={{ color: theme.colors.orange, fontWeight: 700, fontSize: '0.85rem' }}>
+                ⏳ Lagt i kön — men SMS-telefonen är offline, så det skickas först när den är igång igen.
+                Vill du nå fram nu: använd Dela… eller Kopiera i stället.
               </p>
             )}
             {status?.error && (
@@ -180,6 +218,11 @@ export default function SmsSendModal({ initialMessage = '', onClose }) {
       </div>
     </div>
   )
+}
+
+function formatSeen(iso) {
+  const d = new Date(iso)
+  return d.toLocaleString('sv-SE', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).replace(/\./g, '')
 }
 
 const labelStyle = { display: 'block', fontSize: '0.75rem', color: theme.colors.textMuted, fontWeight: 600, marginBottom: '0.25rem' }

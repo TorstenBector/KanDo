@@ -147,7 +147,9 @@ Fliken **Plugg**: aktiviteter (t.ex. "Fysikprov 12/12") med ett veckoschema av p
 - Synk: dirty-flagga + last-write-wins; synkade lokala rader som saknas på servern tas bort vid pull.
 - Dagens pass visas överst i Dagens Fokus. Kortet blir **orange 15 min före start**. **Starta** → nedräkning med **Paus**; vid måltid ljudsignal (om appen är öppen) och valen **Klar** / **Kör 10 min till**. Ej klarmarkerat pass en tidigare dag = missat.
 
-Planerat (ej byggt): Web Push 15 min före (med "Det ska jag komma ihåg" → `confirmed_at`) och när måltiden nås; SMS vid start om obekräftat (svar "OK" bekräftar); kontokoppling med delning av aktivitet (läsrätt) och planeringsförslag från förälder; kalenderprenumeration (webcal) som reservlarm.
+**Pushnotiser** (byggt): edge function `plugg-push` anropas varje minut av pg_cron (`x-cron-secret`, hemligheten i Vault + funktionshemlighet). Påminnelse 15 min före obekräftade pass (`reminder_sent_at`), "Tiden är ute" när ett pågående pass nått måltiden (`done_notified_target`). `starts_at` räknas av en trigger i svensk tid; klienten skickar aldrig dessa serverfält. Prenumerationer i `push_subscriptions` via `register_push_subscription()`. Tryck på notisen öppnar `/?plugg=<id>&bekrafta=1`; Android/dator har även knappen "Det ska jag komma ihåg" (signerad token → `confirmed_at`). iPhone kräver att KanDo ligger på hemskärmen.
+
+Planerat (ej byggt): SMS vid start om obekräftat (svar "OK" bekräftar); kontokoppling med delning av aktivitet (läsrätt) och planeringsförslag från förälder; kalenderprenumeration (webcal) som reservlarm.
 
 ## RLS
 

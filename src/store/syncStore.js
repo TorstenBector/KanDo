@@ -7,6 +7,18 @@ const STALE_SYNC_MS = 2 * 60 * 1000
 
 const SYNCED_TABLES = ['items', 'tags', 'item_images', 'shopping_staples', 'plugg_activities', 'plugg_sessions']
 
+// Supabases felmeddelanden på svenska för de vanligaste fallen.
+export function translateAuthError(error) {
+  const msg = error?.message ?? ''
+  if (/rate limit|too many|security purposes/i.test(msg) || error?.status === 429) {
+    return 'För många mejl eller försök just nu. Vänta en stund, eller skapa konto / logga in med lösenord i stället.'
+  }
+  if (/password should be at least|weak password/i.test(msg)) return 'Lösenordet måste vara minst 6 tecken.'
+  if (/invalid email|unable to validate email/i.test(msg)) return 'E-postadressen ser inte rätt ut.'
+  if (/network|fetch/i.test(msg)) return 'Ingen kontakt med servern — kontrollera uppkopplingen.'
+  return msg || 'Okänt fel'
+}
+
 // Rows edited locally but not yet pushed — across every synced table, not
 // just items (the header badge only counts items).
 export async function countUnsyncedChanges() {
@@ -44,8 +56,9 @@ export const useSyncStore = create((set, get) => ({
       await get().sync()
     }
 
-    supabase.auth.onAuthStateChange(async (_event, session) => {
+    supabase.auth.onAuthStateChange(async (event, session) => {
       set({ session })
+      if (event === 'PASSWORD_RECOVERY') set({ passwordRecovery: true })
       if (session) {
         await claimLocalData(session.user.id)
         get().sync()
@@ -59,7 +72,7 @@ export const useSyncStore = create((set, get) => ({
       email,
       options: { emailRedirectTo: window.location.origin },
     })
-    set({ authMessage: error ? `Fel: ${error.message}` : 'Kolla din mail för inloggningslänken.' })
+    set({ authMessage: error ? `Fel: ${translateAuthError(error)}` : 'Kolla din mail för inloggningslänken. Öppna den på den här enheten.' })
     return !error
   },
 
@@ -69,14 +82,68 @@ export const useSyncStore = create((set, get) => ({
   async signInWithPassword(email, password) {
     set({ authMessage: null })
     const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) set({ authMessage: `Fel: ${error.message}` })
+    if (error) {
+      set({
+        authMessage: /invalid login credentials/i.test(error.message)
+          ? 'Fel e-post eller lösenord. Har du inget lösenord än? Välj "Skapa konto", eller "Glömt lösenord?" om kontot redan finns.'
+          : `Fel: ${translateAuthError(error)}`,
+      })
+    }
     return !error
   },
 
   async setPassword(password) {
     const { error } = await supabase.auth.updateUser({ password })
+    if (!error) set({ passwordRecovery: false })
     return { error }
   },
+
+  // Skapa konto direkt med e-post + lösenord. E-post bekräftas automatiskt
+  // i projektet (mailer_autoconfirm), så man blir inloggad på en gång —
+  // inget mejl behövs. Magisk länk var tidigare enda vägen in för nya
+  // användare: länken öppnades ofta i en annan webbläsare än hemskärms-
+  // appen, och projektet får bara skicka ett par mejl i timmen.
+  async signUpWithPassword(email, password) {
+    set({ authMessage: null })
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: window.location.origin },
+    })
+    const exists =
+      error?.code === 'user_already_exists' ||
+      /already registered/i.test(error?.message ?? '') ||
+      (!error && !data.session && data.user?.identities?.length === 0)
+    if (exists) {
+      set({ authMessage: 'Det finns redan ett konto med den e-posten. Logga in med lösenord, eller välj "Glömt lösenord?".' })
+      return { ok: false, exists: true }
+    }
+    if (error) {
+      set({ authMessage: `Fel: ${translateAuthError(error)}` })
+      return { ok: false }
+    }
+    if (!data.session) {
+      set({ authMessage: 'Kontot är skapat — kolla mejlen för att bekräfta det.' })
+      return { ok: true }
+    }
+    return { ok: true }
+  },
+
+  async resetPassword(email) {
+    set({ authMessage: null })
+    const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin })
+    set({
+      authMessage: error
+        ? `Fel: ${translateAuthError(error)}`
+        : 'Kolla mejlen — öppna länken på den här enheten, så får du välja ett nytt lösenord.',
+    })
+    return !error
+  },
+
+  // Satt av PASSWORD_RECOVERY (länken från "Glömt lösenord") — AccountPanel
+  // öppnar då "Sätt lösenord" direkt.
+  passwordRecovery: false,
+  clearPasswordRecovery: () => set({ passwordRecovery: false }),
 
   // Logga ut rensar även all lokal data (KanDo Vibe #6774: utloggad såg
   // man fortfarande korten, och nästa konto som loggar in på enheten

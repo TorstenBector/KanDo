@@ -2,12 +2,13 @@ import { useEffect, useState } from 'react'
 import { acceptInvite, clearPendingInvite, getInvite } from '../lib/connections'
 import { isIos, isStandalone } from '../lib/push'
 import { useSyncStore } from '../store/syncStore'
+import AuthForm from './AuthForm'
 import { theme } from '../theme'
 
 // Visas när någon öppnat en inbjudningslänk (?koppla=<kod>). Utloggad:
 // uppmaning att logga in (koden sparas och modalen kommer tillbaka efteråt).
 // Inloggad: "Koppla ihop".
-export default function InviteAcceptModal({ token, onOpenLogin, onDone }) {
+export default function InviteAcceptModal({ token, onDone }) {
   const session = useSyncStore((s) => s.session)
   const [invite, setInvite] = useState(null)
   const [state, setState] = useState('idle') // idle | busy | done | error
@@ -88,14 +89,9 @@ export default function InviteAcceptModal({ token, onOpenLogin, onDone }) {
           </div>
         ) : (
           <>
-            <p style={{ ...p, fontWeight: 600 }}>Steg 1: logga in eller skapa konto med din e-post.</p>
-            <div style={{ display: 'flex', gap: '0.6rem', flexWrap: 'wrap', alignItems: 'center' }}>
-              <button onClick={onOpenLogin} style={primaryBtn}>Logga in / skapa konto</button>
-              <button onClick={close} style={linkBtn}>Inte nu</button>
-            </div>
-            <p style={{ ...p, fontSize: '0.8rem', color: theme.colors.textMuted }}>
-              Du får en inloggningslänk i mejlet. Öppna den på samma telefon, så kommer du tillbaka hit och kan koppla ihop er.
-            </p>
+            <p style={{ ...p, fontWeight: 600 }}>Steg 1: skapa ett konto (har du redan ett — välj Logga in).</p>
+            <AuthForm initialMode="signup" />
+            <button onClick={close} style={{ ...linkBtn, alignSelf: 'flex-start' }}>Inte nu</button>
           </>
         )}
         {state === 'error' && <p style={{ ...p, color: theme.colors.danger }}>⚠ {message}</p>}
@@ -121,7 +117,8 @@ const overlay = {
   display: 'flex',
   justifyContent: 'center',
   alignItems: 'flex-start',
-  padding: '4rem 1rem 1rem',
+  padding: '3.5rem 1rem 1rem',
+  overflowY: 'auto',
 }
 
 const panel = {

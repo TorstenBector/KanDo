@@ -288,7 +288,6 @@ export default function KandoApp() {
       {pendingInvite && !accountOpen && (
         <InviteAcceptModal
           token={pendingInvite}
-          onOpenLogin={() => setAccountOpen(true)}
           onDone={() => {
             setPendingInvite(null)
             setTab('plugg')

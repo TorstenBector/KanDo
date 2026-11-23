@@ -3,6 +3,7 @@ import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '../lib/db'
 import { useSyncStore, countUnsyncedChanges } from '../store/syncStore'
 import SetPasswordModal from './SetPasswordModal'
+import AuthForm from './AuthForm'
 import { theme } from '../theme'
 
 // open/onOpenChange are optional — lets SyncNudgeBanner's "Logga in"-knapp
@@ -12,17 +13,15 @@ export default function AccountPanel({ open: controlledOpen, onOpenChange } = {}
   const [internalOpen, setInternalOpen] = useState(false)
   const open = controlledOpen ?? internalOpen
   const setOpen = onOpenChange ?? setInternalOpen
-  const [mode, setMode] = useState('magiclink') // 'magiclink' | 'password'
-  const [email, setEmail] = useState('')
-  const [password, setPasswordInput] = useState('')
   const [passwordModalOpen, setPasswordModalOpen] = useState(false)
 
   const session = useSyncStore((s) => s.session)
   const syncing = useSyncStore((s) => s.syncing)
   const syncError = useSyncStore((s) => s.syncError)
-  const authMessage = useSyncStore((s) => s.authMessage)
-  const sendMagicLink = useSyncStore((s) => s.sendMagicLink)
-  const signInWithPassword = useSyncStore((s) => s.signInWithPassword)
+  // Länken från "Glömt lösenord" loggar in och ska direkt låta en välja
+  // nytt lösenord.
+  const passwordRecovery = useSyncStore((s) => s.passwordRecovery)
+  const clearPasswordRecovery = useSyncStore((s) => s.clearPasswordRecovery)
   const signOut = useSyncStore((s) => s.signOut)
   const sync = useSyncStore((s) => s.sync)
 
@@ -83,15 +82,6 @@ Logga ut ändå?`
     }
   }
 
-  async function handleSend() {
-    if (!email.trim()) return
-    await sendMagicLink(email.trim())
-  }
-
-  async function handlePasswordLogin() {
-    if (!email.trim() || !password) return
-    await signInWithPassword(email.trim(), password)
-  }
 
   return (
     <div style={{ position: 'relative' }}>
@@ -204,58 +194,10 @@ Logga ut ändå?`
             </>
           ) : (
             <>
-              <p style={{ color: theme.colors.text, fontSize: '0.85rem', margin: '0 0 0.6rem' }}>
+              <p style={{ color: theme.colors.text, fontSize: '0.85rem', margin: '0 1.2rem 0.6rem 0' }}>
                 Logga in för att synka mellan enheter.
               </p>
-
-              <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '0.6rem' }}>
-                <button
-                  onClick={() => setMode('magiclink')}
-                  style={mode === 'magiclink' ? tabBtnActive : tabBtn}
-                >
-                  Magisk länk
-                </button>
-                <button
-                  onClick={() => setMode('password')}
-                  style={mode === 'password' ? tabBtnActive : tabBtn}
-                >
-                  Lösenord
-                </button>
-              </div>
-
-              <input
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="din@epost.se"
-                style={{ ...inputStyle, marginBottom: '0.5rem' }}
-              />
-
-              {mode === 'magiclink' ? (
-                <button onClick={handleSend} style={primaryBtn}>Skicka inloggningslänk</button>
-              ) : (
-                <>
-                  <input
-                    type="password"
-                    autoComplete="current-password"
-                    value={password}
-                    onChange={(e) => setPasswordInput(e.target.value)}
-                    placeholder="Lösenord"
-                    style={{ ...inputStyle, marginBottom: '0.5rem' }}
-                  />
-                  <button onClick={handlePasswordLogin} style={primaryBtn}>Logga in</button>
-                  <p style={{ color: theme.colors.textMuted, fontSize: '0.7rem', marginTop: '0.4rem' }}>
-                    Kräver att du satt ett lösenord tidigare (via Magisk länk → Sätt lösenord).
-                  </p>
-                </>
-              )}
-
-              {authMessage && (
-                <p style={{ color: theme.colors.textMuted, fontSize: '0.75rem', marginTop: '0.5rem' }}>
-                  {authMessage}
-                </p>
-              )}
+              <AuthForm compact />
             </>
           )}
 
@@ -267,29 +209,15 @@ Logga ut ändå?`
         </div>
       )}
 
-      <SetPasswordModal open={passwordModalOpen} onClose={() => setPasswordModalOpen(false)} />
+      <SetPasswordModal
+        open={passwordModalOpen || passwordRecovery}
+        onClose={() => {
+          setPasswordModalOpen(false)
+          clearPasswordRecovery()
+        }}
+      />
     </div>
   )
-}
-
-const inputStyle = {
-  width: '100%',
-  boxSizing: 'border-box',
-  padding: '0.4rem 0.5rem',
-  borderRadius: theme.radius.sm,
-  border: `1px solid ${theme.colors.border}`,
-}
-
-const primaryBtn = {
-  background: theme.colors.primary,
-  color: theme.colors.textOnPrimary,
-  border: 'none',
-  borderRadius: theme.radius.sm,
-  padding: '0.4rem 0.8rem',
-  cursor: 'pointer',
-  fontWeight: 600,
-  fontSize: '0.8rem',
-  width: '100%',
 }
 
 const secondaryBtn = {
@@ -301,25 +229,6 @@ const secondaryBtn = {
   cursor: 'pointer',
   fontSize: '0.75rem',
   flex: 1,
-}
-
-const tabBtn = {
-  flex: 1,
-  background: 'transparent',
-  color: theme.colors.textMuted,
-  border: `1px solid ${theme.colors.border}`,
-  borderRadius: theme.radius.sm,
-  padding: '0.3rem 0.4rem',
-  cursor: 'pointer',
-  fontSize: '0.75rem',
-}
-
-const tabBtnActive = {
-  ...tabBtn,
-  background: theme.colors.primary,
-  color: theme.colors.textOnPrimary,
-  border: `1px solid ${theme.colors.primary}`,
-  fontWeight: 600,
 }
 
 const miniLinkBtn = {

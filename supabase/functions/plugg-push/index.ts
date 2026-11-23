@@ -187,6 +187,88 @@ async function tick() {
   return { reminders, done, sms }
 }
 
+// Streak: "X har gjort dagens!" till de andra deltagarna som inte gjort den
+// än idag (en liten knuff), och "X utmanar dig" vid inbjudan.
+async function streakPush(action: string, userId: string, body: Record<string, unknown>) {
+  const challengeId = String(body.challengeId ?? '')
+  const { data: challenge } = await supabase
+    .from('streak_challenges').select('id,title,emoji,weekdays,archived_at').eq('id', challengeId).maybeSingle()
+  if (!challenge || challenge.archived_at) return { error: 'Utmaningen finns inte' }
+  const { data: members } = await supabase
+    .from('streak_members').select('user_id,status').eq('challenge_id', challengeId)
+  const me = members?.find((m) => m.user_id === userId)
+  if (!me || me.status !== 'active') return { error: 'Inte med i utmaningen' }
+  const { data: profile } = await supabase.from('profiles').select('alias').eq('id', userId).maybeSingle()
+  const name = profile?.alias ?? 'Någon'
+
+  if (action === 'streak-invite') {
+    const target = String(body.userId ?? '')
+    const invited = members?.find((m) => m.user_id === target && m.status === 'invited')
+    if (!invited) return { error: 'Ingen sådan inbjudan' }
+    const subs = await loadSubs([target])
+    const delivered = await pushToUser(target, {
+      kind: 'streak',
+      title: `${challenge.emoji} ${name} utmanar dig!`,
+      body: `${challenge.title} — öppna KanDo och anta utmaningen.`,
+      tag: `streak-invite-${challenge.id}`,
+      url: '/?flik=streak',
+    }, subs)
+    return { ok: true, delivered }
+  }
+
+  // streak-checkin: bara om avsändaren faktiskt bockat av idag.
+  const today = new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Stockholm' })
+  const day = String(body.day ?? today)
+  if (day !== today) return { ok: true, skipped: 'inte idag' }
+  const { data: checkins } = await supabase
+    .from('streak_checkins').select('user_id,day').eq('challenge_id', challengeId).gte('day', addDays(today, -400))
+  if (!checkins?.some((k) => k.user_id === userId && k.day === today)) return { error: 'Inte avbockad idag' }
+
+  const doneToday = new Set(checkins.filter((k) => k.day === today).map((k) => k.user_id))
+  const targets = (members ?? []).filter((m) => m.status === 'active' && m.user_id !== userId && !doneToday.has(m.user_id)).map((m) => m.user_id)
+  if (targets.length === 0) return { ok: true, delivered: 0 }
+
+  const streak = countStreak(checkins.filter((k) => k.user_id === userId).map((k) => k.day), challenge.weekdays ?? [], today)
+  const subs = await loadSubs(targets)
+  let delivered = 0
+  for (const t of targets) {
+    delivered += await pushToUser(t, {
+      kind: 'streak',
+      title: `${challenge.emoji} ${name} har gjort dagens ${challenge.title}!`,
+      body: `${name}s streak: ${streak} ${streak === 1 ? 'dag' : 'dagar'} 🔥 Din tur — håll din streak vid liv!`,
+      tag: `streak-${challenge.id}`,
+      url: '/?flik=streak',
+    }, subs)
+  }
+  return { ok: true, delivered }
+}
+
+function addDays(iso: string, n: number): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  const dt = new Date(Date.UTC(y, m - 1, d + n))
+  return dt.toISOString().slice(0, 10)
+}
+
+function isoWeekdayOf(iso: string): number {
+  const [y, m, d] = iso.split('-').map(Number)
+  return ((new Date(Date.UTC(y, m - 1, d)).getUTCDay() + 6) % 7) + 1
+}
+
+// Samma regel som klienten (src/lib/streak.js currentStreak).
+function countStreak(days: string[], weekdays: number[], today: string): number {
+  const done = new Set(days)
+  let count = 0
+  let date = today
+  for (let i = 0; i < 400; i++) {
+    if (!weekdays.length || weekdays.includes(isoWeekdayOf(date))) {
+      if (done.has(date)) count++
+      else if (date !== today) break
+    }
+    date = addDays(date, -1)
+  }
+  return count
+}
+
 // SMSbang-telefonen: larma administratörerna när den varit tyst > 1 h, och
 // när den är tillbaka. Körs var 5:e minut (tick körs varje minut).
 const SMS_OFFLINE_ALERT_SECONDS = 3600
@@ -285,6 +367,13 @@ Deno.serve(async (req) => {
         url: '/?plugg=forslag',
       }, subsByUser)
       return json({ ok: true, delivered })
+    }
+
+    if (action === 'streak-checkin' || action === 'streak-invite') {
+      const jwt = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '')
+      const { data: { user } } = await supabase.auth.getUser(jwt)
+      if (!user) return json({ error: 'Du behöver vara inloggad' }, 401)
+      return json(await streakPush(action, user.id, body))
     }
 
     if (action === 'test') {

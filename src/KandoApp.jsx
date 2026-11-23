@@ -28,12 +28,14 @@ import { refreshPushSubscription } from './lib/push'
 import { readPendingInvite, rememberPendingInvite } from './lib/connections'
 import InviteAcceptModal from './components/InviteAcceptModal'
 import PluggView from './components/PluggView'
+import StreakView from './components/StreakView'
 import { theme } from './theme'
 
 const TABS = [
   { id: 'sok', label: 'Sök' },
   { id: 'fokus', label: 'Dagens Fokus' },
   { id: 'plugg', label: 'Plugg' },
+  { id: 'streak', label: 'Streak' },
   { id: 'backlog', label: 'Backlog' },
   { id: 'prio', label: 'Prio' },
   { id: 'kanban', label: 'Kanban' },
@@ -111,6 +113,14 @@ export default function KandoApp() {
   // samma URL som meddelande i stället för att ladda om (public/push-sw.js).
   async function openPluggFromUrl(href) {
     const url = new URL(href, window.location.origin)
+    // ?flik=streak från en Streak-notis.
+    const tabParam = url.searchParams.get('flik')
+    if (tabParam && TABS.some((t) => t.id === tabParam)) {
+      setTab(tabParam)
+      const clean = new URL(window.location.href)
+      clean.searchParams.delete('flik')
+      window.history.replaceState(null, '', clean.toString())
+    }
     const sessionId = url.searchParams.get('plugg')
     if (!sessionId) return
     setTab('plugg')
@@ -271,6 +281,7 @@ export default function KandoApp() {
       <main style={{ paddingBottom: '5rem' }}>
         {tab === 'fokus' && <DagensFokus selectedTagIds={selectedTagIds} />}
         {tab === 'plugg' && <PluggView />}
+        {tab === 'streak' && <StreakView />}
         {tab === 'backlog' && <BacklogView selectedTagIds={selectedTagIds} />}
         {tab === 'prio' && <PrioListView selectedTagIds={selectedTagIds} />}
         {tab === 'kanban' && <KanbanBoard selectedTagIds={selectedTagIds} />}

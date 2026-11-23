@@ -25,6 +25,8 @@ import { reactivateDueRecurringItems, reactivatePausedItems, migrateLegacyItemSt
 import { seedDefaultStaplesIfEmpty } from './hooks/useShoppingStaples'
 import { confirmSession, topUpPluggSessions } from './hooks/usePlugg'
 import { refreshPushSubscription } from './lib/push'
+import { readPendingInvite, rememberPendingInvite } from './lib/connections'
+import InviteAcceptModal from './components/InviteAcceptModal'
 import PluggView from './components/PluggView'
 import { theme } from './theme'
 
@@ -51,6 +53,18 @@ export default function KandoApp() {
   const [selectedTagIds, setSelectedTagIds] = useState(() => new Set())
   const [exportOpen, setExportOpen] = useState(false)
   const [accountOpen, setAccountOpen] = useState(false)
+  // Inbjudningslänk ?koppla=<kod>: sparas (överlever inloggningen via mejl)
+  // och visas som en modal tills den accepterats eller avfärdats.
+  const [pendingInvite, setPendingInvite] = useState(() => {
+    const url = new URL(window.location.href)
+    const fromUrl = url.searchParams.get('koppla')
+    if (fromUrl) {
+      rememberPendingInvite(fromUrl)
+      url.searchParams.delete('koppla')
+      window.history.replaceState(null, '', url.toString())
+    }
+    return readPendingInvite()
+  })
   const toggleTag = (id) =>
     setSelectedTagIds((prev) => {
       const next = new Set(prev)
@@ -270,6 +284,17 @@ export default function KandoApp() {
       </main>
 
       <QuickCapture />
+
+      {pendingInvite && !accountOpen && (
+        <InviteAcceptModal
+          token={pendingInvite}
+          onOpenLogin={() => setAccountOpen(true)}
+          onDone={() => {
+            setPendingInvite(null)
+            setTab('plugg')
+          }}
+        />
+      )}
     </div>
     </div>
     </div>

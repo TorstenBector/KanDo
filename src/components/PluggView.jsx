@@ -5,6 +5,7 @@ import { formatShortDate, todayISO } from '../lib/date'
 import PluggSessionCard from './PluggSessionCard'
 import PluggActivityEditor from './PluggActivityEditor'
 import PushSettings from './PushSettings'
+import ConnectionsPanel from './ConnectionsPanel'
 import { theme } from '../theme'
 
 const UPCOMING_SHOWN = 4
@@ -68,6 +69,8 @@ export default function PluggView() {
           )}
         </section>
       )}
+
+      <ConnectionsPanel />
 
       {editing && (
         <PluggActivityEditor activity={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />

@@ -12,11 +12,14 @@ function emptySlot() {
 
 // Ny/ändra pluggaktivitet. Toppankrad panel + useVisualViewport, samma
 // iOS-mönster som Snabbfånga (se CLAUDE.md "UI-mönster").
-export default function PluggActivityEditor({ activity, onClose }) {
-  const [title, setTitle] = useState(activity?.title ?? '')
-  const [description, setDescription] = useState(activity?.description ?? '')
-  const [endDate, setEndDate] = useState(activity?.end_date ?? '')
-  const [slots, setSlots] = useState(() => (activity?.schedule?.length ? activity.schedule.map((s) => ({ ...s })) : [emptySlot()]))
+// `initial` = förifyllda värden för en NY aktivitet (t.ex. ett förslag som
+// ska ändras innan det läggs till); onSaved får den sparade aktiviteten.
+export default function PluggActivityEditor({ activity, initial, onClose, onSaved }) {
+  const source = activity ?? initial
+  const [title, setTitle] = useState(source?.title ?? '')
+  const [description, setDescription] = useState(source?.description ?? '')
+  const [endDate, setEndDate] = useState(source?.end_date ?? '')
+  const [slots, setSlots] = useState(() => (source?.schedule?.length ? source.schedule.map((s) => ({ ...s, weekdays: [...(s.weekdays ?? [])] })) : [emptySlot()]))
   const [saving, setSaving] = useState(false)
   const viewport = useVisualViewport()
   useBodyScrollLock(true)
@@ -44,7 +47,10 @@ export default function PluggActivityEditor({ activity, onClose }) {
       schedule: validSlots.map((s) => ({ weekdays: s.weekdays, time: s.time, minutes: Number(s.minutes) })),
     }
     if (activity) await updateActivity(activity.id, data)
-    else await createActivity(data)
+    else {
+      const created = await createActivity(data)
+      await onSaved?.(created)
+    }
     onClose()
   }
 

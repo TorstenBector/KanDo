@@ -206,6 +206,30 @@ Deno.serve(async (req) => {
       return json({ ok: true })
     }
 
+    if (action === 'suggestion') {
+      // Avsändaren av ett planeringsförslag ber oss avisera mottagaren.
+      const jwt = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '')
+      const { data: { user } } = await supabase.auth.getUser(jwt)
+      if (!user) return json({ error: 'Du behöver vara inloggad' }, 401)
+      const { data: s } = await supabase
+        .from('plugg_suggestions')
+        .select('id,from_user,to_user,title,status')
+        .eq('id', body.suggestionId)
+        .eq('from_user', user.id)
+        .maybeSingle()
+      if (!s || s.status !== 'pending') return json({ error: 'Förslaget finns inte' }, 404)
+      const { data: profile } = await supabase.from('profiles').select('alias').eq('id', user.id).maybeSingle()
+      const subsByUser = await loadSubs([s.to_user])
+      const delivered = await pushToUser(s.to_user, {
+        kind: 'suggestion',
+        title: `📬 Pluggförslag från ${profile?.alias ?? 'någon'}`,
+        body: `${s.title} — öppna KanDo och välj Lägg till.`,
+        tag: `plugg-forslag-${s.id}`,
+        url: '/?plugg=forslag',
+      }, subsByUser)
+      return json({ ok: true, delivered })
+    }
+
     if (action === 'test') {
       const jwt = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '')
       const { data: { user } } = await supabase.auth.getUser(jwt)

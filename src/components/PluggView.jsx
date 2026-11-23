@@ -6,6 +6,8 @@ import PluggSessionCard from './PluggSessionCard'
 import PluggActivityEditor from './PluggActivityEditor'
 import PushSettings from './PushSettings'
 import ConnectionsPanel from './ConnectionsPanel'
+import ShareActivityDialog from './ShareActivityDialog'
+import SuggestionsInbox from './SuggestionsInbox'
 import { theme } from '../theme'
 
 const UPCOMING_SHOWN = 4
@@ -26,6 +28,8 @@ export default function PluggView() {
   return (
     <div style={{ padding: '1rem', display: 'flex', flexDirection: 'column', gap: '1.2rem', maxWidth: '720px' }}>
       <button onClick={() => setEditing('new')} style={newBtn}>+ Ny pluggaktivitet</button>
+
+      <SuggestionsInbox />
 
       <PushSettings />
 
@@ -81,6 +85,7 @@ export default function PluggView() {
 
 function ActivityCard({ activity, onEdit, finished = false }) {
   const [showAll, setShowAll] = useState(false)
+  const [sharing, setSharing] = useState(false)
   const sessions = usePluggSessionsFor(activity.id) ?? []
   const today = todayISO()
 
@@ -103,8 +108,12 @@ function ActivityCard({ activity, onEdit, finished = false }) {
             </div>
           )}
         </div>
-        <button onClick={onEdit} style={smallBtn}>✎ Ändra</button>
+        <div style={{ display: 'flex', gap: '0.35rem', flexShrink: 0 }}>
+          <button onClick={() => setSharing(true)} style={smallBtn}>📤 Dela med…</button>
+          <button onClick={onEdit} style={smallBtn}>✎ Ändra</button>
+        </div>
       </div>
+      {sharing && <ShareActivityDialog activity={activity} onClose={() => setSharing(false)} />}
 
       {activity.description && (
         <div style={{ fontSize: '0.9rem', color: theme.colors.text, whiteSpace: 'pre-wrap' }}>{activity.description}</div>
